@@ -1,0 +1,36 @@
+[project]
+name = "web-search"
+version = "0.1.0"
+description = "Web search library with Fallback, Rotation, Cache management, and JSON output (DuckDuckGo, Bing, Google, Yahoo, Qwant, etc.)"
+readme = "README.md"
+authors = [
+    { name = "Laurent VOLFF", email = "laurentvv@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "lxml>=6.1.2",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+websearch = "web_search.cli:main"
+web-search = "web_search.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.5,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "responses>=0.26.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-p no:tmpdir"
+

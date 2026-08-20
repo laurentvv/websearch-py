@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databases & Cache
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+search_cache.db
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Temporary outputs
+results.json
+*.tmp
