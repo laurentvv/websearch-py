@@ -1,5 +1,5 @@
 [project]
-name = "web-search"
+name = "websearch-py"
 version = "0.1.0"
 description = "Web search library with Fallback, Rotation, Cache management, and JSON output (DuckDuckGo, Bing, Google, Yahoo, Qwant, etc.)"
 readme = "README.md"
@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 websearch = "web_search.cli:main"
+websearch-py = "web_search.cli:main"
 web-search = "web_search.cli:main"
 
 [build-system]

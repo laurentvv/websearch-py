@@ -2,10 +2,11 @@
 
 <img src="assets/banner.png" alt="Web Search Banner" width="100%" style="border-radius: 8px; margin-bottom: 20px;" />
 
-# ⚡ Web Search (Python 3.14 & uv)
+# ⚡ websearch-py (Python 3.14 & uv)
 
 **Resilient multi-engine web search scraper with automatic fallback, engine rotation, smart caching, and standardized JSON output.**
 
+[![PyPI Version](https://img.shields.io/pypi/v/websearch-py.svg?style=flat-square&color=blue)](https://pypi.org/project/websearch-py/)
 [![Python Version](https://img.shields.io/badge/python-3.14%2B-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![uv Managed](https://img.shields.io/badge/managed_by-uv-DE5FE9.svg?style=flat-square&logo=astral&logoColor=white)](https://github.com/astral-sh/uv)
 [![Test Suite](https://img.shields.io/badge/tests-55%20passed-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](tests/)
@@ -44,18 +45,25 @@
 - 🛠️ **Developer Ergonomics**:
   - Full **Python 3.14+** support and managed via [**uv**](https://github.com/astral-sh/uv).
   - Modern typing with `py.typed` compliance.
-  - Interactive CLI (`websearch`).
+  - Interactive CLI (`websearch` / `websearch-py`).
 
 ---
 
 ## 📥 Installation
 
-Clone the repository and install dependencies with **uv**:
+```bash
+# Install via uv / pip
+uv add websearch-py
+# or
+pip install websearch-py
+```
+
+Or clone the repository from source:
 
 ```bash
 # Clone repository
-git clone https://github.com/laurentvv/web-search.git
-cd web-search
+git clone https://github.com/laurentvv/websearch-py.git
+cd websearch-py
 
 # Sync dependencies and set up virtual environment
 uv sync
