@@ -1,24 +1,24 @@
-"""Yahoo search engine scraper."""
+"""Mojeek independent search engine scraper."""
 
 from __future__ import annotations
 
 import logging
 from typing import Optional
 
-from web_search.engines.base import BaseSearchEngine
-from web_search.exceptions import EngineError, RateLimitError
-from web_search.models import SearchResult
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
 
 
-class YahooEngine(BaseSearchEngine):
-    """Yahoo web search engine scraper."""
+class MojeekEngine(BaseSearchEngine):
+    """Mojeek independent web search engine scraper."""
 
-    name = "yahoo"
-    display_name = "Yahoo"
+    name = "mojeek"
+    display_name = "Mojeek"
 
-    BASE_URL = "https://search.yahoo.com/search"
+    BASE_URL = "https://www.mojeek.com/search"
 
     def search(
         self,
@@ -27,17 +27,11 @@ class YahooEngine(BaseSearchEngine):
         language: str = "en",
         region: Optional[str] = None,
     ) -> list[SearchResult]:
-        """Execute search on Yahoo."""
-        params = {
-            "p": query,
-            "n": str(min(max_results + 5, 30)),
-            "ei": "UTF-8",
-        }
-        if language:
-            params["vl"] = f"lang_{language}"
+        """Execute search on Mojeek."""
+        params = {"q": query}
 
         headers = self.get_headers()
-        headers["Referer"] = "https://search.yahoo.com/"
+        headers["Referer"] = "https://www.mojeek.com/"
 
         try:
             response = self.session.get(
@@ -49,10 +43,10 @@ class YahooEngine(BaseSearchEngine):
             )
 
             if response.status_code == 429:
-                raise RateLimitError(self.name, "Yahoo rate limit encountered (HTTP 429)")
+                raise RateLimitError(self.name, "Mojeek rate limited (HTTP 429)")
 
             if response.status_code != 200:
-                raise EngineError(self.name, f"Yahoo returned HTTP status {response.status_code}")
+                raise EngineError(self.name, f"Mojeek returned HTTP status {response.status_code}")
 
             results = self._parse_response(response.text, max_results)
             if not results:
@@ -63,17 +57,17 @@ class YahooEngine(BaseSearchEngine):
         except (RateLimitError, EngineError):
             raise
         except Exception as e:
-            raise EngineError(self.name, f"Yahoo request failed: {e}", original_exception=e)
+            raise EngineError(self.name, f"Mojeek search failed: {e}", original_exception=e)
 
     def _parse_response(self, html_text: str, max_results: int) -> list[SearchResult]:
-        """Parse search results from Yahoo HTML."""
+        """Parse results from Mojeek HTML."""
         soup = self.parse_html(html_text)
         results: list[SearchResult] = []
 
-        items = soup.select("div.algo, div.dd.algo, li.algo, div.Sr")
+        items = soup.select("ul.results-standard > li, .results-standard li")
 
         for item in items:
-            title_elem = item.select_one("h3.title a, a.d-ib, h3 a, h4.title a")
+            title_elem = item.select_one("a.title, a.ob")
             if not title_elem:
                 continue
 
@@ -81,10 +75,10 @@ class YahooEngine(BaseSearchEngine):
             raw_url = title_elem.get("href")
             clean_link = self.clean_url(raw_url)
 
-            snippet_elem = item.select_one("div.compText, div.algo-desc, p.lh-16, p")
+            snippet_elem = item.select_one("p.s, p.snippet, p")
             snippet = self.clean_text(snippet_elem.get_text()) if snippet_elem else ""
 
-            if title and clean_link and "search.yahoo.com" not in clean_link:
+            if title and clean_link and "mojeek.com" not in clean_link:
                 results.append(
                     SearchResult(
                         titre=title,

@@ -1,6 +1,6 @@
 """Exemple 4 : Démonstration du Fallback automatique et de la Rotation des moteurs."""
 
-from web_search import RotationStrategy, WebSearcher
+from websearch_py import RotationStrategy, WebSearcher
 
 if __name__ == "__main__":
     print("=== Démonstration Rotation Round-Robin ===")

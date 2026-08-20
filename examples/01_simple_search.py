@@ -1,5 +1,5 @@
 import sys
-from web_search import search
+from websearch_py import search
 
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):

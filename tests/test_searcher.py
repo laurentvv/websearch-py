@@ -3,11 +3,11 @@
 import json
 import pytest
 from unittest.mock import MagicMock
-from web_search.cache import InMemoryCache, NullCache
-from web_search.engines.base import BaseSearchEngine
-from web_search.exceptions import AllEnginesFailedError, EngineError, RateLimitError
-from web_search.models import RotationStrategy, SearchResult
-from web_search.searcher import WebSearcher, search, search_json
+from websearch_py.cache import InMemoryCache, NullCache
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.exceptions import AllEnginesFailedError, EngineError, RateLimitError
+from websearch_py.models import RotationStrategy, SearchResult
+from websearch_py.searcher import WebSearcher, search, search_json
 
 
 class MockEngine(BaseSearchEngine):

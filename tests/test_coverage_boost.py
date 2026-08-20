@@ -3,16 +3,16 @@
 import time
 import pytest
 from unittest.mock import patch
-from web_search.cache.base import BaseCache
-from web_search.cache.memory import InMemoryCache
-from web_search.cache.sqlite import SQLiteCache
-from web_search.engines.base import BaseSearchEngine
-from web_search.engines.registry import EngineRegistry
-from web_search.exceptions import WebSearchError
-from web_search.models import SearchResult, SearchResponse, RotationStrategy
-from web_search.rotation import EngineRotator
-from web_search.searcher import WebSearcher
-from web_search.cli import main
+from websearch_py.cache.base import BaseCache
+from websearch_py.cache.memory import InMemoryCache
+from websearch_py.cache.sqlite import SQLiteCache
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.engines.registry import EngineRegistry
+from websearch_py.exceptions import WebSearchError
+from websearch_py.models import SearchResult, SearchResponse, RotationStrategy
+from websearch_py.rotation import EngineRotator
+from websearch_py.searcher import WebSearcher
+from websearch_py.cli import main
 
 
 class CustomTestEngine(BaseSearchEngine):
@@ -118,7 +118,7 @@ def test_cli_save_to_file():
     from pathlib import Path
     with tempfile.TemporaryDirectory() as tmpdir:
         out_file = str(Path(tmpdir) / "results.json")
-        with patch("web_search.cli.WebSearcher.search") as mock_search:
+        with patch("websearch_py.cli.WebSearcher.search") as mock_search:
             mock_search.return_value = SearchResponse(
                 query="python",
                 results=[SearchResult(titre="Python", url="https://python.org", extrait="Lang", engine="ddg", rank=1)],

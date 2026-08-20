@@ -1,7 +1,7 @@
 """Exemple 3 : Gestion du cache pour requêtes identiques (Mémoire & SQLite)."""
 
 import time
-from web_search import SQLiteCache, WebSearcher
+from websearch_py import SQLiteCache, WebSearcher
 
 if __name__ == "__main__":
     print("=== 1. Test du Cache en Mémoire ===")

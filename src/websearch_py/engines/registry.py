@@ -6,15 +6,15 @@ from typing import Any, Optional, Type
 
 import requests
 
-from web_search.engines.base import BaseSearchEngine
-from web_search.engines.bing import BingEngine
-from web_search.engines.brave import BraveEngine
-from web_search.engines.duckduckgo import DuckDuckGoEngine, DuckDuckGoLiteEngine
-from web_search.engines.google import GoogleEngine
-from web_search.engines.mojeek import MojeekEngine
-from web_search.engines.qwant import QwantEngine
-from web_search.engines.yahoo import YahooEngine
-from web_search.exceptions import WebSearchError
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.engines.bing import BingEngine
+from websearch_py.engines.brave import BraveEngine
+from websearch_py.engines.duckduckgo import DuckDuckGoEngine, DuckDuckGoLiteEngine
+from websearch_py.engines.google import GoogleEngine
+from websearch_py.engines.mojeek import MojeekEngine
+from websearch_py.engines.qwant import QwantEngine
+from websearch_py.engines.yahoo import YahooEngine
+from websearch_py.exceptions import WebSearchError
 
 
 class EngineRegistry:

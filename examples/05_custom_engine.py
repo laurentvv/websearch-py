@@ -1,6 +1,6 @@
 """Exemple 5 : Création et enregistrement d'un moteur de recherche personnalisé."""
 
-from web_search import BaseSearchEngine, EngineRegistry, SearchResult, WebSearcher
+from websearch_py import BaseSearchEngine, EngineRegistry, SearchResult, WebSearcher
 
 
 class WikipediaSearchEngine(BaseSearchEngine):

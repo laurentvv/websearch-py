@@ -2,7 +2,7 @@
 
 import responses
 import pytest
-from web_search.engines import (
+from websearch_py.engines import (
     DuckDuckGoEngine,
     DuckDuckGoLiteEngine,
     BingEngine,
@@ -13,7 +13,7 @@ from web_search.engines import (
     MojeekEngine,
     EngineRegistry,
 )
-from web_search.exceptions import EngineError, RateLimitError
+from websearch_py.exceptions import EngineError, RateLimitError
 from tests.conftest import (
     SAMPLE_DDG_HTML,
     SAMPLE_DDG_LITE_HTML,

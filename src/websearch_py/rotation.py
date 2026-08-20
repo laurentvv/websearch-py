@@ -8,8 +8,8 @@ import random
 import threading
 from typing import Sequence
 
-from web_search.engines.base import BaseSearchEngine
-from web_search.models import RotationStrategy
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.models import RotationStrategy
 
 logger = logging.getLogger(__name__)
 

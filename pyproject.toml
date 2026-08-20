@@ -1,8 +1,9 @@
 [project]
 name = "websearch-py"
 version = "0.1.0"
-description = "Web search library with Fallback, Rotation, Cache management, and JSON output (DuckDuckGo, Bing, Google, Yahoo, Qwant, etc.)"
+description = "Resilient multi-engine web search scraper with automatic fallback, engine rotation, smart caching, and standardized JSON output."
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Laurent VOLFF", email = "laurentvv@gmail.com" }
 ]
@@ -12,11 +13,42 @@ dependencies = [
     "lxml>=6.1.2",
     "requests>=2.34.2",
 ]
+keywords = [
+    "web-search",
+    "search-engine",
+    "duckduckgo",
+    "bing",
+    "google",
+    "yahoo",
+    "qwant",
+    "web-scraping",
+    "beautifulsoup4",
+    "caching",
+    "fallback",
+    "rotation",
+    "sqlite",
+    "json-output",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/laurentvv/websearch-py"
+Repository = "https://github.com/laurentvv/websearch-py.git"
+Issues = "https://github.com/laurentvv/websearch-py/issues"
+Changelog = "https://github.com/laurentvv/websearch-py/releases"
 
 [project.scripts]
-websearch = "web_search.cli:main"
-websearch-py = "web_search.cli:main"
-web-search = "web_search.cli:main"
+websearch = "websearch_py.cli:main"
+websearch-py = "websearch_py.cli:main"
+web-search = "websearch_py.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.5,<0.12.0"]
@@ -34,4 +66,3 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-p no:tmpdir"
-

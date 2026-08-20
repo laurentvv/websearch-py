@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from web_search.models import SearchResult
+    from websearch_py.models import SearchResult
 
 
 def normalize_query(query: str) -> str:

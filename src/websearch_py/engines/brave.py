@@ -1,24 +1,24 @@
-"""Mojeek independent search engine scraper."""
+"""Brave Search engine scraper."""
 
 from __future__ import annotations
 
 import logging
 from typing import Optional
 
-from web_search.engines.base import BaseSearchEngine
-from web_search.exceptions import EngineError, RateLimitError
-from web_search.models import SearchResult
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
 
 
-class MojeekEngine(BaseSearchEngine):
-    """Mojeek independent web search engine scraper."""
+class BraveEngine(BaseSearchEngine):
+    """Brave web search engine scraper."""
 
-    name = "mojeek"
-    display_name = "Mojeek"
+    name = "brave"
+    display_name = "Brave Search"
 
-    BASE_URL = "https://www.mojeek.com/search"
+    BASE_URL = "https://search.brave.com/search"
 
     def search(
         self,
@@ -27,11 +27,13 @@ class MojeekEngine(BaseSearchEngine):
         language: str = "en",
         region: Optional[str] = None,
     ) -> list[SearchResult]:
-        """Execute search on Mojeek."""
-        params = {"q": query}
+        """Execute search on Brave Search."""
+        params = {"q": query, "source": "web"}
+        if country := region:
+            params["country"] = country.lower()
 
         headers = self.get_headers()
-        headers["Referer"] = "https://www.mojeek.com/"
+        headers["Referer"] = "https://search.brave.com/"
 
         try:
             response = self.session.get(
@@ -43,10 +45,10 @@ class MojeekEngine(BaseSearchEngine):
             )
 
             if response.status_code == 429:
-                raise RateLimitError(self.name, "Mojeek rate limited (HTTP 429)")
+                raise RateLimitError(self.name, "Brave Search rate limit encountered (HTTP 429)")
 
             if response.status_code != 200:
-                raise EngineError(self.name, f"Mojeek returned HTTP status {response.status_code}")
+                raise EngineError(self.name, f"Brave returned HTTP status {response.status_code}")
 
             results = self._parse_response(response.text, max_results)
             if not results:
@@ -57,28 +59,31 @@ class MojeekEngine(BaseSearchEngine):
         except (RateLimitError, EngineError):
             raise
         except Exception as e:
-            raise EngineError(self.name, f"Mojeek search failed: {e}", original_exception=e)
+            raise EngineError(self.name, f"Brave search failed: {e}", original_exception=e)
 
     def _parse_response(self, html_text: str, max_results: int) -> list[SearchResult]:
-        """Parse results from Mojeek HTML."""
+        """Parse search results from Brave Search HTML."""
         soup = self.parse_html(html_text)
         results: list[SearchResult] = []
 
-        items = soup.select("ul.results-standard > li, .results-standard li")
+        items = soup.select('div.snippet[data-type="web"], div.snippet, div.result')
 
         for item in items:
-            title_elem = item.select_one("a.title, a.ob")
-            if not title_elem:
+            title_elem = item.select_one(".title, a.heading, .snippet-title, h3")
+            link_elem = item.select_one("a[href]")
+            if not title_elem or not link_elem:
                 continue
 
             title = self.clean_text(title_elem.get_text())
-            raw_url = title_elem.get("href")
+            raw_url = link_elem.get("href")
             clean_link = self.clean_url(raw_url)
 
-            snippet_elem = item.select_one("p.s, p.snippet, p")
+            snippet_elem = item.select_one(
+                ".snippet-description, .snippet-content, div.generic-snippet, p"
+            )
             snippet = self.clean_text(snippet_elem.get_text()) if snippet_elem else ""
 
-            if title and clean_link and "mojeek.com" not in clean_link:
+            if title and clean_link and "search.brave.com" not in clean_link:
                 results.append(
                     SearchResult(
                         titre=title,

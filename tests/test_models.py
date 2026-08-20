@@ -1,7 +1,7 @@
 """Tests for SearchResult and SearchResponse data models."""
 
 import json
-from web_search.models import SearchResponse, SearchResult
+from websearch_py.models import SearchResponse, SearchResult
 
 
 def test_search_result_attributes_and_aliases():

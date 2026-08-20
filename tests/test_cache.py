@@ -1,8 +1,8 @@
 """Tests for cache backends (InMemoryCache, SQLiteCache, NullCache)."""
 
 import time
-from web_search.cache import InMemoryCache, NullCache, SQLiteCache, normalize_query
-from web_search.models import SearchResult
+from websearch_py.cache import InMemoryCache, NullCache, SQLiteCache, normalize_query
+from websearch_py.models import SearchResult
 
 
 def test_query_normalization():

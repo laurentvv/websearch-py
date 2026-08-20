@@ -10,9 +10,9 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from web_search.cache.base import BaseCache
-from web_search.exceptions import CacheError
-from web_search.models import SearchResult
+from websearch_py.cache.base import BaseCache
+from websearch_py.exceptions import CacheError
+from websearch_py.models import SearchResult
 
 
 class SQLiteCache(BaseCache):

@@ -7,9 +7,9 @@ from typing import Optional
 
 import requests
 
-from web_search.engines.base import BaseSearchEngine
-from web_search.exceptions import EngineError, RateLimitError
-from web_search.models import SearchResult
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
 

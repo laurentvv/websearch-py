@@ -12,12 +12,12 @@ from typing import Any, Optional
 import requests
 from bs4 import BeautifulSoup
 
-from web_search.exceptions import (
+from websearch_py.exceptions import (
     EngineError,
     EngineParseError,
     RateLimitError,
 )
-from web_search.models import SearchResult
+from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
 

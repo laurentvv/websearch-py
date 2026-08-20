@@ -1,18 +1,17 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="Web Search Banner" width="100%" style="border-radius: 8px; margin-bottom: 20px;" />
+<img src="https://raw.githubusercontent.com/laurentvv/websearch-py/main/assets/banner.png" alt="websearch-py Banner" width="100%" style="border-radius: 8px; margin-bottom: 20px;" />
 
-# ⚡ websearch-py (Python 3.14 & uv)
+# ⚡ websearch-py
 
 **Resilient multi-engine web search scraper with automatic fallback, engine rotation, smart caching, and standardized JSON output.**
 
 [![PyPI Version](https://img.shields.io/pypi/v/websearch-py.svg?style=flat-square&color=blue)](https://pypi.org/project/websearch-py/)
 [![Python Version](https://img.shields.io/badge/python-3.14%2B-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![uv Managed](https://img.shields.io/badge/managed_by-uv-DE5FE9.svg?style=flat-square&logo=astral&logoColor=white)](https://github.com/astral-sh/uv)
-[![Test Suite](https://img.shields.io/badge/tests-55%20passed-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-84%25-green.svg?style=flat-square)](tests/)
+[![Test Suite](https://img.shields.io/badge/tests-55%20passed-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](https://github.com/laurentvv/websearch-py/tree/main/tests)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square)](https://github.com/psf/black)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://github.com/laurentvv/websearch-py/blob/main/LICENSE)
 
 [Features](#-key-features) • [Installation](#-installation) • [Quickstart](#-quickstart) • [CLI Usage](#-command-line-interface-cli) • [Architecture](#-architecture) • [Custom Engines](#-custom-search-engines)
 

@@ -2,8 +2,8 @@
 
 import json
 from unittest.mock import patch
-from web_search.cli import main
-from web_search.models import SearchResponse, SearchResult
+from websearch_py.cli import main
+from websearch_py.models import SearchResponse, SearchResult
 
 
 def test_cli_list_engines(capsys):
@@ -20,7 +20,7 @@ def test_cli_empty_query(capsys):
     assert ret == 1
 
 
-@patch("web_search.cli.WebSearcher.search")
+@patch("websearch_py.cli.WebSearcher.search")
 def test_cli_search_json_output(mock_search, capsys):
     mock_results = [
         SearchResult(titre="FastAPI", url="https://fastapi.tiangolo.com", extrait="Framework", engine="ddg", rank=1)
@@ -44,7 +44,7 @@ def test_cli_search_json_output(mock_search, capsys):
     assert parsed[0]["extrait"] == "Framework"
 
 
-@patch("web_search.cli.WebSearcher.search")
+@patch("websearch_py.cli.WebSearcher.search")
 def test_cli_search_detailed_output(mock_search, capsys):
     mock_results = [
         SearchResult(titre="Python", url="https://python.org", extrait="Lang", engine="ddg", rank=1)

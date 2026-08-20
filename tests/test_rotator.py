@@ -1,9 +1,9 @@
 """Tests for engine rotation and fallback strategies."""
 
 from unittest.mock import MagicMock
-from web_search.engines.base import BaseSearchEngine
-from web_search.models import RotationStrategy
-from web_search.rotation import EngineRotator
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.models import RotationStrategy
+from websearch_py.rotation import EngineRotator
 
 
 class DummyEngine(BaseSearchEngine):

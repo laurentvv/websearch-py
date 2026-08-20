@@ -1,5 +1,5 @@
 import sys
-from web_search import search_json
+from websearch_py import search_json
 
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):

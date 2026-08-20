@@ -7,24 +7,24 @@ import logging
 import time
 from typing import Optional, Sequence, Union
 
-from web_search.cache.base import BaseCache
-from web_search.cache.memory import InMemoryCache
-from web_search.cache.null import NullCache
-from web_search.cache.sqlite import SQLiteCache
-from web_search.engines.base import BaseSearchEngine
-from web_search.engines.registry import EngineRegistry
-from web_search.exceptions import (
+from websearch_py.cache.base import BaseCache
+from websearch_py.cache.memory import InMemoryCache
+from websearch_py.cache.null import NullCache
+from websearch_py.cache.sqlite import SQLiteCache
+from websearch_py.engines.base import BaseSearchEngine
+from websearch_py.engines.registry import EngineRegistry
+from websearch_py.exceptions import (
     AllEnginesFailedError,
     EngineError,
     WebSearchError,
 )
-from web_search.models import (
+from websearch_py.models import (
     EngineName,
     RotationStrategy,
     SearchResponse,
     SearchResult,
 )
-from web_search.rotation import EngineRotator
+from websearch_py.rotation import EngineRotator
 
 logger = logging.getLogger(__name__)
 

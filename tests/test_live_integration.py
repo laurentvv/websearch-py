@@ -1,8 +1,8 @@
 """Integration tests querying real search engine endpoints."""
 
 import pytest
-from web_search import WebSearcher, search, search_json
-from web_search.cache import InMemoryCache
+from websearch_py import WebSearcher, search, search_json
+from websearch_py.cache import InMemoryCache
 
 
 def is_online():
