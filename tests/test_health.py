@@ -99,6 +99,40 @@ def test_only_blocks_make_an_engine_rest_and_the_rest_doubles_up_to_a_cap():
     assert not health.is_resting("a") and health.status()["a"]["consecutive_blocks"] == 0
 
 
+def test_a_success_resets_the_doubling_cooldown():
+    clock = FakeClock()
+    health = EngineHealth(cooldown_s=60, max_cooldown_s=1000, clock=clock)
+    for expected_rest in (60, 120, 240):
+        health.record_failure("a", ChallengeError("a", "captcha"))
+        assert health.status()["a"]["rest_left_s"] == expected_rest
+
+    health.record_success("a")
+    assert health.status()["a"] == {"resting": False, "rest_left_s": 0.0, "consecutive_blocks": 0, "last_error": ""}
+
+    health.record_failure("a", RateLimitError("a", "429"))  # the next block starts again from the base cooldown
+    assert health.status()["a"]["rest_left_s"] == 60 and health.status()["a"]["consecutive_blocks"] == 1
+
+
+def test_a_successful_search_resets_the_doubling_cooldown_of_the_engine():
+    clock = FakeClock()
+    health = EngineHealth(cooldown_s=300, clock=clock)
+    block = ChallengeError("flaky", "captcha")
+    flaky = ScriptedEngine("flaky", [block, block, hit("flaky"), block])
+    good = ScriptedEngine("good", [hit("good")])
+    s = WebSearcher(engines=[flaky, good], cache=False, health=health)
+
+    s.search("q1", use_cache=False)
+    assert s.engine_status()["flaky"]["rest_left_s"] == 300
+    clock.t += 301
+    s.search("q2", use_cache=False)
+    assert s.engine_status()["flaky"]["rest_left_s"] == 600  # second block in a row: doubled
+    clock.t += 601
+    assert s.search("q3", use_cache=False).engine_used == "flaky"
+    assert s.engine_status()["flaky"]["consecutive_blocks"] == 0
+    s.search("q4", use_cache=False)
+    assert s.engine_status()["flaky"]["rest_left_s"] == 300  # not 1200: the success cleared the streak
+
+
 def test_a_blocked_engine_is_skipped_on_the_next_queries_and_comes_back_later():
     clock = FakeClock()
     health = EngineHealth(cooldown_s=300, clock=clock)
