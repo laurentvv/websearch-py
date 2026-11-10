@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import responses
 
 from tests.conftest import (
     SAMPLE_BING_HTML,
@@ -13,7 +14,12 @@ from tests.conftest import (
     SAMPLE_MOJEEK_HTML,
     SAMPLE_YAHOO_HTML,
 )
+from websearch_py.engines import DuckDuckGoEngine, DuckDuckGoLiteEngine
 from websearch_py.engines.base import looks_blocked
+from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
+
+DDG_HTML = "https://html.duckduckgo.com/html/"
+DDG_LITE = "https://lite.duckduckgo.com/lite/"
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -38,6 +44,13 @@ MARKER_WORDS = (
 
 def fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def assert_plain_no_results(error: BaseException) -> None:
+    """The error of a genuine empty answer: never a RateLimitError, so the engine is not put to rest."""
+    assert isinstance(error, EngineError)
+    assert not isinstance(error, RateLimitError)
+    assert "No results found" in str(error)
 
 
 # --- looks_blocked(): what a challenge page is -----------------------------------------------------------------------
@@ -134,3 +147,112 @@ def test_the_query_echoed_in_a_form_or_script_address_is_not_a_block():
 @pytest.mark.parametrize("answer", ["", "   \n", '{"status":"error","data":{"error_code":50}}', "plain text"])
 def test_empty_and_non_html_answers_are_not_challenges(answer):
     assert not looks_blocked(answer)
+
+
+# --- DuckDuckGo ------------------------------------------------------------------------------------------------------
+@responses.activate
+def test_duckduckgo_http_202_is_a_challenge_and_stops_the_search():
+    # The answer captured on 2026-11-10: HTTP 202 carrying the anomaly modal.
+    responses.add(responses.POST, DDG_HTML, body=fixture("ddg_html_anomaly.html"), status=202)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoEngine().search("python")
+    assert len(responses.calls) == 1  # no GET retry, no Lite fallback: they would feed the bot detection
+
+
+@responses.activate
+def test_duckduckgo_http_202_on_the_get_retry_is_a_challenge():
+    responses.add(responses.POST, DDG_HTML, body="<html><body></body></html>", status=200)
+    responses.add(responses.GET, DDG_HTML, status=202)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoEngine().search("python")
+    assert len(responses.calls) == 2
+
+
+@responses.activate
+def test_duckduckgo_http_202_on_the_lite_fallback_is_a_challenge():
+    responses.add(responses.POST, DDG_HTML, status=500)
+    responses.add(responses.GET, DDG_HTML, status=500)
+    responses.add(responses.POST, DDG_LITE, status=202)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoEngine().search("python")
+
+
+@responses.activate
+def test_duckduckgo_anomaly_page_with_http_200_is_a_challenge():
+    responses.add(responses.POST, DDG_HTML, body=fixture("ddg_html_anomaly.html"), status=200)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoEngine().search("python")
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+@pytest.mark.parametrize("status", [403, 429])
+def test_duckduckgo_refusals_stay_rate_limits(status):
+    responses.add(responses.POST, DDG_HTML, status=status)
+
+    with pytest.raises(RateLimitError) as err:
+        DuckDuckGoEngine().search("python")
+    assert not isinstance(err.value, ChallengeError)
+
+
+@responses.activate
+def test_duckduckgo_genuine_no_result_page_is_a_plain_error_after_one_request():
+    responses.add(responses.POST, DDG_HTML, body=fixture("ddg_html_no_results.html"), status=200)
+
+    with pytest.raises(EngineError) as err:
+        DuckDuckGoEngine().search('"qzxvjkwpytmnbvqzxplkwhgfd" "xkqjzvwpqmznbxcvlkjh"')
+    assert_plain_no_results(err.value)
+    assert len(responses.calls) == 1  # the page is conclusive: no GET retry, no Lite fallback
+
+
+@responses.activate
+def test_duckduckgo_genuine_no_result_on_the_lite_fallback_is_a_plain_error():
+    responses.add(responses.POST, DDG_HTML, status=500)
+    responses.add(responses.GET, DDG_HTML, status=500)
+    responses.add(responses.POST, DDG_LITE, body=fixture("ddg_lite_no_results.html"), status=200)
+
+    with pytest.raises(EngineError) as err:
+        DuckDuckGoEngine().search('"qzxvjkwpytmnbvqzxplkwhgfd" "xkqjzvwpqmznbxcvlkjh"')
+    assert_plain_no_results(err.value)
+    assert len(responses.calls) == 3
+
+
+@responses.activate
+def test_duckduckgo_unrecognised_empty_pages_are_a_plain_error_after_every_endpoint():
+    for method, url in [(responses.POST, DDG_HTML), (responses.GET, DDG_HTML), (responses.POST, DDG_LITE)]:
+        responses.add(method, url, body="<html><body><p>Something new</p></body></html>", status=200)
+    responses.add(responses.GET, DDG_LITE, body="<html><body><p>Something new</p></body></html>", status=200)
+
+    with pytest.raises(EngineError) as err:
+        DuckDuckGoEngine().search("python")
+    assert_plain_no_results(err.value)
+    assert len(responses.calls) == 4
+
+
+@responses.activate
+def test_duckduckgo_lite_engine_http_202_is_a_challenge():
+    responses.add(responses.POST, DDG_LITE, status=202)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoLiteEngine().search("python")
+
+
+@responses.activate
+def test_duckduckgo_lite_engine_anomaly_page_with_http_200_is_a_challenge():
+    responses.add(responses.POST, DDG_LITE, body=fixture("ddg_html_anomaly.html"), status=200)
+
+    with pytest.raises(ChallengeError):
+        DuckDuckGoLiteEngine().search("python")
+
+
+@responses.activate
+def test_duckduckgo_lite_engine_genuine_no_result_page_is_a_plain_error():
+    responses.add(responses.POST, DDG_LITE, body=fixture("ddg_lite_no_results.html"), status=200)
+
+    with pytest.raises(EngineError) as err:
+        DuckDuckGoLiteEngine().search('"qzxvjkwpytmnbvqzxplkwhgfd" "xkqjzvwpqmznbxcvlkjh"')
+    assert_plain_no_results(err.value)
