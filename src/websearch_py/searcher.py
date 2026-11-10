@@ -5,7 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import time
-from typing import Optional, Sequence, Union
+from collections.abc import Sequence
 
 from websearch_py.cache.base import BaseCache
 from websearch_py.cache.memory import InMemoryCache
@@ -13,17 +13,13 @@ from websearch_py.cache.null import NullCache
 from websearch_py.cache.sqlite import SQLiteCache
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.engines.registry import EngineRegistry
-from websearch_py.health import SHARED_HEALTH, EngineHealth
 from websearch_py.exceptions import (
     AllEnginesFailedError,
-    EngineError,
-    WebSearchError,
 )
+from websearch_py.health import SHARED_HEALTH, EngineHealth
 from websearch_py.models import (
-    EngineName,
     RotationStrategy,
     SearchResponse,
-    SearchResult,
 )
 from websearch_py.rotation import EngineRotator
 
@@ -46,13 +42,13 @@ class WebSearcher:
 
     def __init__(
         self,
-        engines: Optional[Sequence[Union[str, BaseSearchEngine]]] = None,
-        cache: Optional[Union[BaseCache, str, bool]] = None,
-        strategy: Union[RotationStrategy, str] = RotationStrategy.FALLBACK_PRIORITY,
+        engines: Sequence[str | BaseSearchEngine] | None = None,
+        cache: BaseCache | str | bool | None = None,
+        strategy: RotationStrategy | str = RotationStrategy.FALLBACK_PRIORITY,
         timeout: float = 10.0,
         cache_ttl: int = 3600,
-        proxies: Optional[dict[str, str]] = None,
-        health: Optional[EngineHealth] = None,
+        proxies: dict[str, str] | None = None,
+        health: EngineHealth | None = None,
     ):
         """Initialize WebSearcher.
 
@@ -77,9 +73,7 @@ class WebSearcher:
             if isinstance(eng, BaseSearchEngine):
                 self._engines.append(eng)
             elif isinstance(eng, str):
-                self._engines.append(
-                    EngineRegistry.create(eng, timeout=timeout, proxies=proxies)
-                )
+                self._engines.append(EngineRegistry.create(eng, timeout=timeout, proxies=proxies))
             else:
                 raise TypeError(f"Invalid engine type: {type(eng)}")
 
@@ -108,9 +102,9 @@ class WebSearcher:
         query: str,
         max_results: int = 10,
         language: str = "fr",
-        region: Optional[str] = None,
+        region: str | None = None,
         use_cache: bool = True,
-        cache_ttl: Optional[int] = None,
+        cache_ttl: int | None = None,
     ) -> SearchResponse:
         """Execute a web search query with caching, rotation, and fallback.
 
@@ -194,7 +188,7 @@ class WebSearcher:
         query: str,
         max_results: int,
         language: str,
-        region: Optional[str],
+        region: str | None,
         start_time: float,
     ) -> SearchResponse:
         """Attempt engines sequentially according to rotator order."""
@@ -251,7 +245,7 @@ class WebSearcher:
         query: str,
         max_results: int,
         language: str,
-        region: Optional[str],
+        region: str | None,
         start_time: float,
     ) -> SearchResponse:
         """Query all engines concurrently and return the fastest valid response."""
@@ -268,9 +262,7 @@ class WebSearcher:
             )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(engines)) as executor:
-            future_to_engine = {
-                executor.submit(_task, eng): eng for eng in engines
-            }
+            future_to_engine = {executor.submit(_task, eng): eng for eng in engines}
 
             for future in concurrent.futures.as_completed(future_to_engine):
                 engine = future_to_engine[future]
@@ -304,11 +296,11 @@ class WebSearcher:
         query: str,
         max_results: int = 10,
         language: str = "fr",
-        region: Optional[str] = None,
+        region: str | None = None,
         detailed: bool = False,
-        indent: Optional[int] = 2,
+        indent: int | None = 2,
         use_cache: bool = True,
-        cache_ttl: Optional[int] = None,
+        cache_ttl: int | None = None,
     ) -> str:
         """Execute a search and directly output standard JSON string.
 
@@ -340,7 +332,7 @@ class WebSearcher:
 
 # Convenience singleton and top-level functions
 
-_default_searcher: Optional[WebSearcher] = None
+_default_searcher: WebSearcher | None = None
 
 
 def get_default_searcher() -> WebSearcher:
@@ -355,10 +347,10 @@ def search(
     query: str,
     max_results: int = 10,
     language: str = "fr",
-    region: Optional[str] = None,
+    region: str | None = None,
     use_cache: bool = True,
-    strategy: Union[RotationStrategy, str] = RotationStrategy.FALLBACK_PRIORITY,
-    engines: Optional[Sequence[Union[str, BaseSearchEngine]]] = None,
+    strategy: RotationStrategy | str = RotationStrategy.FALLBACK_PRIORITY,
+    engines: Sequence[str | BaseSearchEngine] | None = None,
 ) -> SearchResponse:
     """Top-level convenience search function.
 
@@ -398,12 +390,12 @@ def search_json(
     query: str,
     max_results: int = 10,
     language: str = "fr",
-    region: Optional[str] = None,
+    region: str | None = None,
     detailed: bool = False,
-    indent: Optional[int] = 2,
+    indent: int | None = 2,
     use_cache: bool = True,
-    strategy: Union[RotationStrategy, str] = RotationStrategy.FALLBACK_PRIORITY,
-    engines: Optional[Sequence[Union[str, BaseSearchEngine]]] = None,
+    strategy: RotationStrategy | str = RotationStrategy.FALLBACK_PRIORITY,
+    engines: Sequence[str | BaseSearchEngine] | None = None,
 ) -> str:
     """Top-level convenience search function outputting JSON string with titre, url, extrait.
 

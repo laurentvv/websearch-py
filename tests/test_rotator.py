@@ -1,6 +1,5 @@
 """Tests for engine rotation and fallback strategies."""
 
-from unittest.mock import MagicMock
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.models import RotationStrategy
 from websearch_py.rotation import EngineRotator
@@ -53,4 +52,4 @@ def test_random_rotation():
     ordered = rotator.get_ordered_engines()
 
     assert len(ordered) == 3
-    assert set(e.name for e in ordered) == {"engine1", "engine2", "engine3"}
+    assert {e.name for e in ordered} == {"engine1", "engine2", "engine3"}

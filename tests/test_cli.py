@@ -2,6 +2,7 @@
 
 import json
 from unittest.mock import patch
+
 from websearch_py.cli import main
 from websearch_py.models import SearchResponse, SearchResult
 
@@ -46,9 +47,7 @@ def test_cli_search_json_output(mock_search, capsys):
 
 @patch("websearch_py.cli.WebSearcher.search")
 def test_cli_search_detailed_output(mock_search, capsys):
-    mock_results = [
-        SearchResult(titre="Python", url="https://python.org", extrait="Lang", engine="ddg", rank=1)
-    ]
+    mock_results = [SearchResult(titre="Python", url="https://python.org", extrait="Lang", engine="ddg", rank=1)]
     mock_search.return_value = SearchResponse(
         query="python",
         results=mock_results,
@@ -69,6 +68,7 @@ def test_cli_search_detailed_output(mock_search, capsys):
 def test_cli_clear_cache(capsys):
     import tempfile
     from pathlib import Path
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_file = str(Path(tmpdir) / "temp_cache.db")
         ret = main(["--clear-cache", "--cache-db", db_file])

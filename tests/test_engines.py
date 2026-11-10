@@ -1,29 +1,29 @@
 """Tests for individual search engine scrapers using mocked HTTP responses."""
 
-import responses
 import pytest
-from websearch_py.engines import (
-    DuckDuckGoEngine,
-    DuckDuckGoLiteEngine,
-    BingEngine,
-    GoogleEngine,
-    YahooEngine,
-    QwantEngine,
-    BraveEngine,
-    MojeekEngine,
-    EngineRegistry,
-)
-from websearch_py.exceptions import EngineError, RateLimitError
+import responses
+
 from tests.conftest import (
+    SAMPLE_BING_HTML,
+    SAMPLE_BRAVE_HTML,
     SAMPLE_DDG_HTML,
     SAMPLE_DDG_LITE_HTML,
-    SAMPLE_BING_HTML,
     SAMPLE_GOOGLE_HTML,
-    SAMPLE_YAHOO_HTML,
-    SAMPLE_QWANT_API_JSON,
-    SAMPLE_BRAVE_HTML,
     SAMPLE_MOJEEK_HTML,
+    SAMPLE_QWANT_API_JSON,
+    SAMPLE_YAHOO_HTML,
 )
+from websearch_py.engines import (
+    BingEngine,
+    BraveEngine,
+    DuckDuckGoEngine,
+    EngineRegistry,
+    GoogleEngine,
+    MojeekEngine,
+    QwantEngine,
+    YahooEngine,
+)
+from websearch_py.exceptions import RateLimitError
 
 
 @responses.activate

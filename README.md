@@ -136,7 +136,7 @@ from web_search import WebSearcher, RotationStrategy, SQLiteCache
 searcher = WebSearcher(
     engines=["duckduckgo", "bing", "yahoo", "google", "qwant"],
     strategy=RotationStrategy.ROUND_ROBIN,
-    cache=SQLiteCache(db_path="search_cache.db", default_ttl_seconds=86400), # 24h TTL
+    cache=SQLiteCache(db_path="search_cache.db", default_ttl_seconds=86400),  # 24h TTL
     timeout=10.0,
 )
 
@@ -212,6 +212,7 @@ Easily create and register custom search providers by inheriting from `BaseSearc
 ```python
 from web_search import BaseSearchEngine, EngineRegistry, SearchResult, WebSearcher
 
+
 class WikipediaSearchEngine(BaseSearchEngine):
     name = "wikipedia"
     display_name = "Wikipedia OpenSearch"
@@ -233,6 +234,7 @@ class WikipediaSearchEngine(BaseSearchEngine):
             )
             for i in range(len(titles))
         ]
+
 
 # Register engine
 EngineRegistry.register("wikipedia", WikipediaSearchEngine)

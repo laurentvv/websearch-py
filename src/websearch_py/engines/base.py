@@ -7,7 +7,6 @@ import random
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
-from typing import Any, Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -15,8 +14,6 @@ from bs4 import BeautifulSoup
 from websearch_py.exceptions import (
     ChallengeError,
     EngineError,
-    EngineParseError,
-    RateLimitError,
 )
 from websearch_py.models import SearchResult
 
@@ -63,9 +60,9 @@ class BaseSearchEngine(ABC):
     def __init__(
         self,
         timeout: float = 10.0,
-        proxies: Optional[dict[str, str]] = None,
-        headers: Optional[dict[str, str]] = None,
-        session: Optional[requests.Session] = None,
+        proxies: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        session: requests.Session | None = None,
     ):
         """Initialize engine.
 
@@ -112,7 +109,7 @@ class BaseSearchEngine(ABC):
         except Exception:
             return BeautifulSoup(html_content, "html.parser")
 
-    def clean_text(self, text: Optional[str]) -> str:
+    def clean_text(self, text: str | None) -> str:
         """Clean and normalize extracted text string."""
         if not text:
             return ""
@@ -120,7 +117,7 @@ class BaseSearchEngine(ABC):
         cleaned = re.sub(r"\s+", " ", text).strip()
         return cleaned
 
-    def clean_url(self, raw_url: Optional[str]) -> Optional[str]:
+    def clean_url(self, raw_url: str | None) -> str | None:
         """Normalize and unwrap tracking / redirect URLs."""
         if not raw_url:
             return None
@@ -151,6 +148,7 @@ class BaseSearchEngine(ABC):
         # Handle Bing redirect: /ck/a?!...&u=a1<base64>
         if "/ck/a?!" in raw_url and "u=" in raw_url:
             import base64
+
             parsed = urllib.parse.urlparse(raw_url)
             qs = urllib.parse.parse_qs(parsed.query)
             if "u" in qs:
@@ -162,7 +160,7 @@ class BaseSearchEngine(ABC):
                         decoded = base64.urlsafe_b64decode(u_b64).decode("utf-8", errors="ignore")
                         if decoded.startswith("http"):
                             return decoded
-                    except Exception:
+                    except Exception:  # noqa: S110 - not a base64 redirect: fall through to the plain URL checks
                         pass
 
         # Handle Yahoo redirect: /RU=https%3a%2f%2f.../RK=2/RS=...
@@ -177,7 +175,7 @@ class BaseSearchEngine(ABC):
         if raw_url.startswith("//"):
             raw_url = "https:" + raw_url
 
-        if raw_url.startswith("http://") or raw_url.startswith("https://"):
+        if raw_url.startswith(("http://", "https://")):
             return raw_url
 
         return None
@@ -188,7 +186,7 @@ class BaseSearchEngine(ABC):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search query and return list of SearchResult items.
 
@@ -197,4 +195,3 @@ class BaseSearchEngine(ABC):
             EngineParseError: If parsing fails
             EngineError: For general engine / network failures
         """
-        pass

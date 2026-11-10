@@ -5,7 +5,6 @@ from __future__ import annotations
 import collections
 import threading
 import time
-from typing import Optional
 
 from websearch_py.cache.base import BaseCache
 from websearch_py.models import SearchResult
@@ -23,9 +22,7 @@ class InMemoryCache(BaseCache):
         """
         super().__init__(default_ttl_seconds=default_ttl_seconds)
         self.max_entries = max_entries
-        self._cache: collections.OrderedDict[str, tuple[float, list[SearchResult]]] = (
-            collections.OrderedDict()
-        )
+        self._cache: collections.OrderedDict[str, tuple[float, list[SearchResult]]] = collections.OrderedDict()
         self._lock = threading.RLock()
 
     def get(
@@ -33,8 +30,8 @@ class InMemoryCache(BaseCache):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-    ) -> Optional[list[SearchResult]]:
+        region: str | None = None,
+    ) -> list[SearchResult] | None:
         """Retrieve cached search results if valid and not expired."""
         key = self.make_key(query, max_results, language, region)
         now = time.time()
@@ -59,8 +56,8 @@ class InMemoryCache(BaseCache):
         results: list[SearchResult],
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-        ttl: Optional[int] = None,
+        region: str | None = None,
+        ttl: int | None = None,
     ) -> None:
         """Store results in memory cache."""
         key = self.make_key(query, max_results, language, region)
@@ -81,7 +78,7 @@ class InMemoryCache(BaseCache):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> bool:
         """Delete query from memory cache."""
         key = self.make_key(query, max_results, language, region)
@@ -101,9 +98,7 @@ class InMemoryCache(BaseCache):
         now = time.time()
         purged = 0
         with self._lock:
-            expired_keys = [
-                k for k, (exp, _) in self._cache.items() if now >= exp
-            ]
+            expired_keys = [k for k, (exp, _) in self._cache.items() if now >= exp]
             for k in expired_keys:
                 del self._cache[k]
                 purged += 1

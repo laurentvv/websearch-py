@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, Type
+from typing import ClassVar
 
 import requests
 
@@ -20,7 +20,7 @@ from websearch_py.exceptions import WebSearchError
 class EngineRegistry:
     """Registry mapping engine identifiers to engine classes."""
 
-    _ENGINES: dict[str, Type[BaseSearchEngine]] = {
+    _ENGINES: ClassVar[dict[str, type[BaseSearchEngine]]] = {
         "duckduckgo": DuckDuckGoEngine,
         "ddg": DuckDuckGoEngine,
         "duckduckgo_lite": DuckDuckGoLiteEngine,
@@ -34,12 +34,12 @@ class EngineRegistry:
     }
 
     @classmethod
-    def register(cls, name: str, engine_cls: Type[BaseSearchEngine]) -> None:
+    def register(cls, name: str, engine_cls: type[BaseSearchEngine]) -> None:
         """Register a new custom search engine class."""
         cls._ENGINES[name.lower().strip()] = engine_cls
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseSearchEngine]:
+    def get(cls, name: str) -> type[BaseSearchEngine]:
         """Get engine class by name or alias."""
         key = name.lower().strip()
         if key not in cls._ENGINES:
@@ -58,9 +58,9 @@ class EngineRegistry:
         cls,
         name: str,
         timeout: float = 10.0,
-        proxies: Optional[dict[str, str]] = None,
-        headers: Optional[dict[str, str]] = None,
-        session: Optional[requests.Session] = None,
+        proxies: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        session: requests.Session | None = None,
     ) -> BaseSearchEngine:
         """Instantiate an engine by name."""
         engine_cls = cls.get(name)

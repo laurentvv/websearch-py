@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import EngineError, RateLimitError
@@ -26,7 +25,7 @@ class QwantEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on Qwant."""
         results: list[SearchResult] = []
@@ -56,12 +55,7 @@ class QwantEngine(BaseSearchEngine):
                 raise RateLimitError(self.name, "Qwant rate limited")
             if resp.status_code == 200:
                 data = resp.json()
-                items = (
-                    data.get("data", {})
-                    .get("result", {})
-                    .get("items", {})
-                    .get("mainline", [])
-                )
+                items = data.get("data", {}).get("result", {}).get("items", {}).get("mainline", [])
                 for group in items:
                     for item in group.get("items", []):
                         title = self.clean_text(item.get("title"))

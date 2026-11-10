@@ -1,22 +1,24 @@
 """Additional unit tests for edge cases and 100% core coverage."""
 
 import time
-import pytest
 from unittest.mock import patch
-from websearch_py.cache.base import BaseCache
+
+import pytest
+
 from websearch_py.cache.memory import InMemoryCache
 from websearch_py.cache.sqlite import SQLiteCache
+from websearch_py.cli import main
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.engines.registry import EngineRegistry
 from websearch_py.exceptions import WebSearchError
-from websearch_py.models import SearchResult, SearchResponse, RotationStrategy
+from websearch_py.models import RotationStrategy, SearchResponse, SearchResult
 from websearch_py.rotation import EngineRotator
 from websearch_py.searcher import WebSearcher
-from websearch_py.cli import main
 
 
 class CustomTestEngine(BaseSearchEngine):
     name = "custom_test"
+
     def search(self, query, **kwargs):
         return [SearchResult(titre="Custom", url="https://custom.com", extrait="Custom desc")]
 
@@ -116,6 +118,7 @@ def test_search_result_to_json_with_metadata():
 def test_cli_save_to_file():
     import tempfile
     from pathlib import Path
+
     with tempfile.TemporaryDirectory() as tmpdir:
         out_file = str(Path(tmpdir) / "results.json")
         with patch("websearch_py.cli.WebSearcher.search") as mock_search:

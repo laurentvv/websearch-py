@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
-import requests
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import EngineError, RateLimitError
@@ -28,7 +25,7 @@ class DuckDuckGoEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on DuckDuckGo."""
         results: list[SearchResult] = []
@@ -97,7 +94,9 @@ class DuckDuckGoEngine(BaseSearchEngine):
                     proxies=self.proxies,
                 )
                 if response_lite.status_code in (202, 403, 429):
-                    raise RateLimitError(self.name, f"DuckDuckGo Lite rate limit or challenge (HTTP {response_lite.status_code})")
+                    raise RateLimitError(
+                        self.name, f"DuckDuckGo Lite rate limit or challenge (HTTP {response_lite.status_code})"
+                    )
 
                 if response_lite.status_code == 200:
                     results = self._parse_lite_response(response_lite.text, max_results)
@@ -111,7 +110,9 @@ class DuckDuckGoEngine(BaseSearchEngine):
                         proxies=self.proxies,
                     )
                     if resp_lite_get.status_code in (202, 403, 429):
-                        raise RateLimitError(self.name, f"DuckDuckGo Lite GET challenge (HTTP {resp_lite_get.status_code})")
+                        raise RateLimitError(
+                            self.name, f"DuckDuckGo Lite GET challenge (HTTP {resp_lite_get.status_code})"
+                        )
                     if resp_lite_get.status_code == 200:
                         results = self._parse_lite_response(resp_lite_get.text, max_results)
             except RateLimitError:
@@ -208,7 +209,7 @@ class DuckDuckGoLiteEngine(DuckDuckGoEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         payload = {"q": query, "kl": "wt-wt", "b": ""}
         headers = self.get_headers()
@@ -232,7 +233,7 @@ class DuckDuckGoLiteEngine(DuckDuckGoEngine):
             if not results:
                 raise EngineError(self.name, f"No results found for query '{query}'")
             return results
-        except (RateLimitError, EngineError):
+        except RateLimitError, EngineError:
             raise
         except Exception as e:
             raise EngineError(self.name, f"Request failed: {e}", original_exception=e)

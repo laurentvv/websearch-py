@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import EngineError, RateLimitError
@@ -25,7 +24,7 @@ class YahooEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on Yahoo."""
         params = {
@@ -60,7 +59,7 @@ class YahooEngine(BaseSearchEngine):
 
             return results[:max_results]
 
-        except (RateLimitError, EngineError):
+        except RateLimitError, EngineError:
             raise
         except Exception as e:
             raise EngineError(self.name, f"Yahoo request failed: {e}", original_exception=e)

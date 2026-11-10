@@ -1,4 +1,5 @@
 import sys
+
 from websearch_py import search
 
 if __name__ == "__main__":

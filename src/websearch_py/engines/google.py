@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import urllib.parse
-from typing import Optional
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import EngineError, RateLimitError
@@ -37,7 +35,7 @@ class GoogleEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on Google."""
         params = {
@@ -74,7 +72,7 @@ class GoogleEngine(BaseSearchEngine):
 
             return results[:max_results]
 
-        except (RateLimitError, EngineError):
+        except RateLimitError, EngineError:
             raise
         except Exception as e:
             raise EngineError(self.name, f"Google request failed: {e}", original_exception=e)
@@ -86,9 +84,7 @@ class GoogleEngine(BaseSearchEngine):
         seen_urls: set[str] = set()
 
         # Strategy 1: Look for containers (Gx5Zad, ZINbbc, g, tF2Cxc, MjjYud)
-        containers = soup.select(
-            "div.Gx5Zad, div.ZINbbc, div.g, div.tF2Cxc, div.MjjYud, div.kCrYT"
-        )
+        containers = soup.select("div.Gx5Zad, div.ZINbbc, div.g, div.tF2Cxc, div.MjjYud, div.kCrYT")
 
         for container in containers:
             # Find link with href

@@ -1,9 +1,10 @@
 """Tests for WebSearcher coordinator, fallback, rotation, and cache management."""
 
 import json
+
 import pytest
-from unittest.mock import MagicMock
-from websearch_py.cache import InMemoryCache, NullCache
+
+from websearch_py.cache import InMemoryCache
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import AllEnginesFailedError, EngineError, RateLimitError
 from websearch_py.models import RotationStrategy, SearchResult
@@ -11,7 +12,7 @@ from websearch_py.searcher import WebSearcher, search, search_json
 
 
 class MockEngine(BaseSearchEngine):
-    def __init__(self, name: str, results: list[SearchResult] = None, fail_with: Exception = None):
+    def __init__(self, name: str, results: list[SearchResult] | None = None, fail_with: Exception | None = None):
         super().__init__()
         self.name = name
         self.results = results or []
@@ -65,7 +66,9 @@ def test_searcher_cache_hit():
 def test_searcher_fallback_on_error():
     # Engine 1 fails with RateLimitError, Engine 2 succeeds
     eng1 = MockEngine("ddg", fail_with=RateLimitError("ddg", "429 Too Many Requests"))
-    res_bing = [SearchResult(titre="Bing Result", url="https://bing.com/res", extrait="Bing Snip", engine="bing", rank=1)]
+    res_bing = [
+        SearchResult(titre="Bing Result", url="https://bing.com/res", extrait="Bing Snip", engine="bing", rank=1)
+    ]
     eng2 = MockEngine("bing", results=res_bing)
 
     searcher = WebSearcher(engines=[eng1, eng2], cache=False)
@@ -82,7 +85,9 @@ def test_searcher_fallback_on_error():
 def test_searcher_fallback_on_zero_results():
     # Engine 1 returns empty list, Engine 2 succeeds
     eng1 = MockEngine("ddg", results=[])
-    res_bing = [SearchResult(titre="Bing Result", url="https://bing.com/res", extrait="Bing Snip", engine="bing", rank=1)]
+    res_bing = [
+        SearchResult(titre="Bing Result", url="https://bing.com/res", extrait="Bing Snip", engine="bing", rank=1)
+    ]
     eng2 = MockEngine("bing", results=res_bing)
 
     searcher = WebSearcher(engines=[eng1, eng2], cache=False)
@@ -130,8 +135,16 @@ def test_searcher_round_robin_rotation():
 
 def test_search_json_output_format():
     res = [
-        SearchResult(titre="FastAPI", url="https://fastapi.tiangolo.com", extrait="Web framework", engine="ddg", rank=1),
-        SearchResult(titre="Django", url="https://djangoproject.com", extrait="Web framework for perfectionists", engine="ddg", rank=2),
+        SearchResult(
+            titre="FastAPI", url="https://fastapi.tiangolo.com", extrait="Web framework", engine="ddg", rank=1
+        ),
+        SearchResult(
+            titre="Django",
+            url="https://djangoproject.com",
+            extrait="Web framework for perfectionists",
+            engine="ddg",
+            rank=2,
+        ),
     ]
     eng = MockEngine("ddg", results=res)
     searcher = WebSearcher(engines=[eng], cache=False)
@@ -208,4 +221,3 @@ def test_searcher_empty_query_raises():
     searcher = WebSearcher(engines=["duckduckgo"], cache=False)
     with pytest.raises(ValueError):
         searcher.search("   ")
-

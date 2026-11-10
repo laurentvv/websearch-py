@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import itertools
 import logging
 import random
 import threading
-from typing import Sequence
+from collections.abc import Sequence
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.models import RotationStrategy

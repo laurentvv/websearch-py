@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.exceptions import EngineError, RateLimitError
@@ -25,7 +24,7 @@ class BraveEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on Brave Search."""
         params = {"q": query, "source": "web"}
@@ -56,7 +55,7 @@ class BraveEngine(BaseSearchEngine):
 
             return results[:max_results]
 
-        except (RateLimitError, EngineError):
+        except RateLimitError, EngineError:
             raise
         except Exception as e:
             raise EngineError(self.name, f"Brave search failed: {e}", original_exception=e)
@@ -78,9 +77,7 @@ class BraveEngine(BaseSearchEngine):
             raw_url = link_elem.get("href")
             clean_link = self.clean_url(raw_url)
 
-            snippet_elem = item.select_one(
-                ".snippet-description, .snippet-content, div.generic-snippet, p"
-            )
+            snippet_elem = item.select_one(".snippet-description, .snippet-content, div.generic-snippet, p")
             snippet = self.clean_text(snippet_elem.get_text()) if snippet_elem else ""
 
             if title and clean_link and "search.brave.com" not in clean_link:
