@@ -7,22 +7,24 @@ as well as response wrappers with metadata (cache status, engine used, execution
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class RotationStrategy(str, Enum):
     """Available engine rotation and fallback strategies."""
+
     FALLBACK_PRIORITY = "fallback_priority"  # Tries engines in exact configured order
-    ROUND_ROBIN = "round_robin"              # Rotates starting engine on each query, then falls back
-    RANDOM = "random"                        # Picks a random starting engine, then falls back
-    FASTEST = "fastest"                      # Queries engines concurrently and returns first successful
+    ROUND_ROBIN = "round_robin"  # Rotates starting engine on each query, then falls back
+    RANDOM = "random"  # Picks a random starting engine, then falls back
+    FASTEST = "fastest"  # Queries engines concurrently and returns first successful
 
 
 class EngineName(str, Enum):
     """Supported built-in search engines."""
+
     DUCKDUCKGO = "duckduckgo"
     DUCKDUCKGO_LITE = "duckduckgo_lite"
     BING = "bing"
@@ -85,7 +87,7 @@ class SearchResult:
             "extrait": self.extrait,
         }
 
-    def to_json(self, include_metadata: bool = False, indent: Optional[int] = 2) -> str:
+    def to_json(self, include_metadata: bool = False, indent: int | None = 2) -> str:
         """Serialize result to JSON string."""
         return json.dumps(
             self.to_dict(include_metadata=include_metadata),
@@ -114,9 +116,7 @@ class SearchResponse:
     cached: bool = False
     execution_time_ms: float = 0.0
     fallback_history: list[str] = field(default_factory=list)
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __len__(self) -> int:
         return len(self.results)
@@ -156,7 +156,7 @@ class SearchResponse:
             "results": results_data,
         }
 
-    def to_json(self, detailed: bool = False, indent: Optional[int] = 2) -> str:
+    def to_json(self, detailed: bool = False, indent: int | None = 2) -> str:
         """Serialize search response to JSON string.
 
         Args:

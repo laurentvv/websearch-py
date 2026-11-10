@@ -1,6 +1,7 @@
 """Tests for cache backends (InMemoryCache, SQLiteCache, NullCache)."""
 
 import time
+
 from websearch_py.cache import InMemoryCache, NullCache, SQLiteCache, normalize_query
 from websearch_py.models import SearchResult
 
@@ -12,9 +13,7 @@ def test_query_normalization():
 
 def test_in_memory_cache_basic_operations():
     cache = InMemoryCache(default_ttl_seconds=60)
-    results = [
-        SearchResult(titre="Test", url="https://test.com", extrait="Snip", engine="ddg", rank=1)
-    ]
+    results = [SearchResult(titre="Test", url="https://test.com", extrait="Snip", engine="ddg", rank=1)]
 
     # Cache miss
     assert cache.get("python") is None
@@ -99,12 +98,11 @@ def test_sqlite_cache_in_memory():
 def test_sqlite_cache_persistence():
     import tempfile
     from pathlib import Path
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_file = Path(tmpdir) / "test_cache.db"
         with SQLiteCache(db_path=db_file, default_ttl_seconds=3600) as cache1:
-            results = [
-                SearchResult(titre="Persist", url="https://persist.com", extrait="Snippet")
-            ]
+            results = [SearchResult(titre="Persist", url="https://persist.com", extrait="Snippet")]
             cache1.set("persistent query", results)
 
         # Re-open in a separate instance

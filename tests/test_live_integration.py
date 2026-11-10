@@ -1,20 +1,21 @@
-"""Integration tests querying real search engine endpoints."""
+"""Integration tests querying real search engine endpoints.
+
+Opt-in: they only run with ``WEBSEARCH_LIVE=1``. The default test run stays offline, is deterministic, and does
+not feed the rate limiters of the engines on every run.
+"""
+
+import os
 
 import pytest
-from websearch_py import WebSearcher, search, search_json
+
+from websearch_py import WebSearcher, search_json
 from websearch_py.cache import InMemoryCache
 
-
-def is_online():
-    import socket
-    try:
-        socket.create_connection(("1.1.1.1", 53), timeout=2.0)
-        return True
-    except OSError:
-        return False
+pytestmark = pytest.mark.skipif(
+    os.environ.get("WEBSEARCH_LIVE") != "1", reason="live engine tests are opt-in: set WEBSEARCH_LIVE=1"
+)
 
 
-@pytest.mark.skipif(not is_online(), reason="Internet connection not available")
 def test_live_search_fallback_chain():
     searcher = WebSearcher(engines=["duckduckgo", "bing"], cache=False, timeout=15.0)
     resp = searcher.search("Rust programming language", max_results=3, language="en")
@@ -27,7 +28,6 @@ def test_live_search_fallback_chain():
     assert first.extrait is not None
 
 
-@pytest.mark.skipif(not is_online(), reason="Internet connection not available")
 def test_live_search_bing():
     searcher = WebSearcher(engines=["bing"], cache=False, timeout=15.0)
     resp = searcher.search("Golang official documentation", max_results=3, language="en")
@@ -39,9 +39,9 @@ def test_live_search_bing():
     assert first.url.startswith("http")
 
 
-@pytest.mark.skipif(not is_online(), reason="Internet connection not available")
 def test_live_search_json_output():
     import json
+
     json_str = search_json("TypeScript tutorial", max_results=2, use_cache=False)
     data = json.loads(json_str)
 
@@ -53,7 +53,6 @@ def test_live_search_json_output():
     assert data[0]["url"].startswith("http")
 
 
-@pytest.mark.skipif(not is_online(), reason="Internet connection not available")
 def test_live_cache_hit_on_identical_query():
     cache = InMemoryCache()
     searcher = WebSearcher(engines=["duckduckgo", "bing"], cache=cache, timeout=15.0)
@@ -61,7 +60,6 @@ def test_live_cache_hit_on_identical_query():
     # 1. First search -> Cache Miss
     resp1 = searcher.search("Python async await tutorial", max_results=3)
     assert resp1.cached is False
-    engine_used = resp1.engine_used
 
     # 2. Second search with identical query (different casing/spacing) -> Cache Hit
     resp2 = searcher.search("  PYTHON Async Await Tutorial   ", max_results=3)

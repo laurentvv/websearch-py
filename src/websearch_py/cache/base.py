@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from websearch_py.models import SearchResult
@@ -35,7 +35,7 @@ class BaseCache(ABC):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> str:
         """Generate a deterministic cache key from search parameters.
 
@@ -64,10 +64,9 @@ class BaseCache(ABC):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-    ) -> Optional[list[SearchResult]]:
+        region: str | None = None,
+    ) -> list[SearchResult] | None:
         """Retrieve cached search results if available and not expired."""
-        pass
 
     @abstractmethod
     def set(
@@ -76,11 +75,10 @@ class BaseCache(ABC):
         results: list[SearchResult],
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-        ttl: Optional[int] = None,
+        region: str | None = None,
+        ttl: int | None = None,
     ) -> None:
         """Store search results in cache with TTL."""
-        pass
 
     @abstractmethod
     def delete(
@@ -88,20 +86,17 @@ class BaseCache(ABC):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> bool:
         """Delete specific search results from cache."""
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Clear all entries from the cache."""
-        pass
 
     @abstractmethod
     def purge_expired(self) -> int:
         """Remove all expired cache entries and return count of removed items."""
-        pass
 
     def __contains__(self, query: str) -> bool:
         return self.get(query) is not None

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from collections.abc import Callable
 
 import requests
 
-from websearch_py.engines.base import BaseSearchEngine
-from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.engines.base import BaseSearchEngine, looks_blocked
+from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
 from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,9 @@ class DuckDuckGoEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
-        """Execute search on DuckDuckGo."""
-        results: list[SearchResult] = []
-
+        """Execute search on DuckDuckGo: HTML endpoint first, Lite endpoint as a fallback."""
         # Region format for DuckDuckGo: wt-wt (worldwide), fr-fr, us-en, etc.
         kl = "wt-wt"
         if region:
@@ -40,89 +38,72 @@ class DuckDuckGoEngine(BaseSearchEngine):
         elif language:
             kl = f"{language.lower()}-{language.lower()}"
 
-        payload = {
-            "q": query,
-            "kl": kl,
-            "b": "",
-        }
-
-        headers = self.get_headers()
-        headers["Origin"] = "https://html.duckduckgo.com"
-        headers["Referer"] = "https://html.duckduckgo.com/"
-
-        # 1. Try DuckDuckGo HTML endpoint (POST then GET)
-        try:
-            response = self.session.post(
-                self.HTML_URL,
-                data=payload,
-                headers=headers,
-                timeout=self.timeout,
-                proxies=self.proxies,
-            )
-            if response.status_code in (202, 403, 429):
-                raise RateLimitError(self.name, f"DuckDuckGo rate limit or challenge (HTTP {response.status_code})")
-
-            if response.status_code == 200:
-                results = self._parse_html_response(response.text, max_results)
-
-            if not results:
-                # Try GET on HTML_URL
-                resp_get = self.session.get(
-                    self.HTML_URL,
-                    params={"q": query, "kl": kl},
-                    headers=headers,
-                    timeout=self.timeout,
-                    proxies=self.proxies,
-                )
-                if resp_get.status_code in (202, 403, 429):
-                    raise RateLimitError(self.name, f"DuckDuckGo GET challenge (HTTP {resp_get.status_code})")
-                if resp_get.status_code == 200:
-                    results = self._parse_html_response(resp_get.text, max_results)
-        except RateLimitError:
-            raise
-        except Exception as e:
-            logger.warning(f"DuckDuckGo HTML endpoint error: {e}, falling back to Lite endpoint")
-
-        # 2. Fallback to DuckDuckGo Lite endpoint (POST then GET)
-        if not results:
+        endpoints = (
+            (self.HTML_URL, "https://html.duckduckgo.com", self._parse_html_response),
+            (self.LITE_URL, "https://lite.duckduckgo.com", self._parse_lite_response),
+        )
+        for url, origin, parse in endpoints:
             try:
-                headers_lite = self.get_headers()
-                headers_lite["Origin"] = "https://lite.duckduckgo.com"
-                headers_lite["Referer"] = "https://lite.duckduckgo.com/"
-                response_lite = self.session.post(
-                    self.LITE_URL,
-                    data=payload,
-                    headers=headers_lite,
-                    timeout=self.timeout,
-                    proxies=self.proxies,
-                )
-                if response_lite.status_code in (202, 403, 429):
-                    raise RateLimitError(self.name, f"DuckDuckGo Lite rate limit or challenge (HTTP {response_lite.status_code})")
-
-                if response_lite.status_code == 200:
-                    results = self._parse_lite_response(response_lite.text, max_results)
-
-                if not results:
-                    resp_lite_get = self.session.get(
-                        self.LITE_URL,
-                        params={"q": query, "kl": kl},
-                        headers=headers_lite,
-                        timeout=self.timeout,
-                        proxies=self.proxies,
-                    )
-                    if resp_lite_get.status_code in (202, 403, 429):
-                        raise RateLimitError(self.name, f"DuckDuckGo Lite GET challenge (HTTP {resp_lite_get.status_code})")
-                    if resp_lite_get.status_code == 200:
-                        results = self._parse_lite_response(resp_lite_get.text, max_results)
-            except RateLimitError:
+                results = self._search_endpoint(url, origin, parse, query, kl, max_results)
+            except EngineError:
+                # A block or a genuine "no results" page ends the search: asking the other endpoint again
+                # would only feed the bot detection.
                 raise
             except Exception as e:
-                logger.warning(f"DuckDuckGo Lite endpoint error: {e}")
+                logger.warning(f"DuckDuckGo endpoint {url} error: {e}")
+                continue
+            if results:
+                return results[:max_results]
 
-        if not results:
-            raise EngineError(self.name, f"No results found for query: '{query}'")
+        raise self.empty_result_error(query)
 
-        return results[:max_results]
+    def _search_endpoint(
+        self,
+        url: str,
+        origin: str,
+        parse: Callable[[str, int], list[SearchResult]],
+        query: str,
+        kl: str,
+        max_results: int,
+    ) -> list[SearchResult]:
+        """POST then GET on one endpoint.
+
+        Raises on a block and on a genuine "no results" page; returns [] when the answers could not be used.
+        """
+        headers = self.get_headers()
+        headers["Origin"] = origin
+        headers["Referer"] = f"{origin}/"
+
+        requests_to_try = (
+            (self.session.post, {"data": {"q": query, "kl": kl, "b": ""}}),
+            (self.session.get, {"params": {"q": query, "kl": kl}}),
+        )
+        for send, arguments in requests_to_try:
+            response = send(url, headers=headers, timeout=self.timeout, proxies=self.proxies, **arguments)
+            self._raise_if_blocked(response)
+            if response.status_code != 200:
+                continue
+            results = parse(response.text, max_results)
+            if results:
+                return results
+            if error := self._empty_page_error(query, response.text):
+                raise error
+        return []
+
+    def _raise_if_blocked(self, response: requests.Response) -> None:
+        """HTTP 202 is how DuckDuckGo serves its anomaly page (bot challenge); 403 and 429 are refusals."""
+        if response.status_code == 202:
+            raise ChallengeError(self.name, f"{self.display_name} answered with a bot challenge (HTTP 202)")
+        if response.status_code in (403, 429):
+            raise RateLimitError(self.name, f"{self.display_name} rate limit (HTTP {response.status_code})")
+
+    def _empty_page_error(self, query: str, html_text: str) -> EngineError | None:
+        """What a page without results is: a bot challenge, a genuine "no results" page, or unknown (None)."""
+        if looks_blocked(html_text, query):
+            return ChallengeError(self.name, f"{self.display_name} answered with a bot challenge (anomaly page)")
+        if self.parse_html(html_text).select_one(".no-results, .result--no-result"):
+            return self.empty_result_error(query)
+        return None
 
     def _parse_html_response(self, html_text: str, max_results: int) -> list[SearchResult]:
         """Parse standard DuckDuckGo HTML page."""
@@ -208,7 +189,7 @@ class DuckDuckGoLiteEngine(DuckDuckGoEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         payload = {"q": query, "kl": "wt-wt", "b": ""}
         headers = self.get_headers()
@@ -223,16 +204,15 @@ class DuckDuckGoLiteEngine(DuckDuckGoEngine):
                 timeout=self.timeout,
                 proxies=self.proxies,
             )
-            if resp.status_code == 429:
-                raise RateLimitError(self.name, "DuckDuckGo Lite rate limited")
+            self._raise_if_blocked(resp)
             if resp.status_code != 200:
                 raise EngineError(self.name, f"HTTP status {resp.status_code}")
 
             results = self._parse_lite_response(resp.text, max_results)
             if not results:
-                raise EngineError(self.name, f"No results found for query '{query}'")
+                raise self._empty_page_error(query, resp.text) or self.empty_result_error(query)
             return results
-        except (RateLimitError, EngineError):
+        except EngineError:
             raise
         except Exception as e:
-            raise EngineError(self.name, f"Request failed: {e}", original_exception=e)
+            raise EngineError(self.name, f"Request failed: {e}", original_exception=e) from e

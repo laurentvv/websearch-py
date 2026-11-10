@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import urllib.parse
-from typing import Optional
 
 from websearch_py.engines.base import BaseSearchEngine
-from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
 from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -37,7 +35,7 @@ class GoogleEngine(BaseSearchEngine):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> list[SearchResult]:
         """Execute search on Google."""
         params = {
@@ -62,8 +60,10 @@ class GoogleEngine(BaseSearchEngine):
             )
 
             # Check for bot block / captcha
-            if response.status_code == 429 or "sorry/index" in response.url:
-                raise RateLimitError(self.name, "Google rate limit or CAPTCHA encountered")
+            if "sorry/index" in response.url:
+                raise ChallengeError(self.name, "Google answered with a bot challenge (redirect to its captcha page)")
+            if response.status_code == 429:
+                raise RateLimitError(self.name, "Google rate limit encountered (HTTP 429)")
 
             if response.status_code != 200:
                 raise EngineError(self.name, f"Google returned HTTP status {response.status_code}")
@@ -74,7 +74,7 @@ class GoogleEngine(BaseSearchEngine):
 
             return results[:max_results]
 
-        except (RateLimitError, EngineError):
+        except RateLimitError, EngineError:
             raise
         except Exception as e:
             raise EngineError(self.name, f"Google request failed: {e}", original_exception=e)
@@ -86,9 +86,7 @@ class GoogleEngine(BaseSearchEngine):
         seen_urls: set[str] = set()
 
         # Strategy 1: Look for containers (Gx5Zad, ZINbbc, g, tF2Cxc, MjjYud)
-        containers = soup.select(
-            "div.Gx5Zad, div.ZINbbc, div.g, div.tF2Cxc, div.MjjYud, div.kCrYT"
-        )
+        containers = soup.select("div.Gx5Zad, div.ZINbbc, div.g, div.tF2Cxc, div.MjjYud, div.kCrYT")
 
         for container in containers:
             # Find link with href

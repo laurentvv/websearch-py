@@ -170,3 +170,16 @@ def _reset_shared_engine_health():
     SHARED_HEALTH.reset()
     yield
     SHARED_HEALTH.reset()
+
+
+@pytest.fixture(autouse=True)
+def _offline_by_default(request, monkeypatch):
+    """No test may open a socket, except the opt-in live suite (tests/test_live_integration.py)."""
+    if request.module.__name__.endswith("test_live_integration"):
+        return
+
+    def refuse(self, address, *args, **kwargs):
+        raise RuntimeError(f"network access attempted in an offline test: {address!r}")
+
+    monkeypatch.setattr("socket.socket.connect", refuse)
+    monkeypatch.setattr("socket.socket.connect_ex", refuse)

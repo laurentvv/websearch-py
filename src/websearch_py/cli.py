@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 from websearch_py import (
     EngineRegistry,
-    RotationStrategy,
     SQLiteCache,
     WebSearcher,
     __version__,
@@ -132,12 +129,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(args: Optional[list[str]] = None) -> int:
+def main(args: list[str] | None = None) -> int:
     """Main CLI entrypoint."""
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
+        except Exception:  # noqa: S110 - a console that cannot be reconfigured keeps its encoding
             pass
 
     parser = build_parser()
@@ -207,8 +204,10 @@ def main(args: Optional[list[str]] = None) -> int:
             # Human readable output
             lines = [
                 f"\n=== Résultats pour '{response.query}' ===",
-                f"Moteur: {response.engine_used} | Cache: {'OUI' if response.cached else 'NON'} | "
-                f"Temps: {response.execution_time_ms:.1f}ms | Total: {len(response.results)}\n",
+                (
+                    f"Moteur: {response.engine_used} | Cache: {'OUI' if response.cached else 'NON'} | "
+                    f"Temps: {response.execution_time_ms:.1f}ms | Total: {len(response.results)}\n"
+                ),
             ]
             for r in response.results:
                 lines.append(f"[{r.rank}] {r.titre}")

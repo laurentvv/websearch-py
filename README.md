@@ -9,11 +9,11 @@
 [![PyPI Version](https://img.shields.io/pypi/v/websearch-py.svg?style=flat-square&color=blue)](https://pypi.org/project/websearch-py/)
 [![Python Version](https://img.shields.io/badge/python-3.14%2B-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![uv Managed](https://img.shields.io/badge/managed_by-uv-DE5FE9.svg?style=flat-square&logo=astral&logoColor=white)](https://github.com/astral-sh/uv)
-[![Test Suite](https://img.shields.io/badge/tests-55%20passed-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](https://github.com/laurentvv/websearch-py/tree/main/tests)
-[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square)](https://github.com/psf/black)
+[![Test Suite](https://img.shields.io/badge/tests-162%20passed-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](https://github.com/laurentvv/websearch-py/tree/main/tests)
+[![Code Style](https://img.shields.io/badge/code%20style-ruff-000000.svg?style=flat-square)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://github.com/laurentvv/websearch-py/blob/main/LICENSE)
 
-[Features](#-key-features) • [Installation](#-installation) • [Quickstart](#-quickstart) • [CLI Usage](#-command-line-interface-cli) • [Architecture](#-architecture) • [Custom Engines](#-custom-search-engines)
+[Features](#-key-features) • [Installation](#-installation) • [Quickstart](#-quickstart) • [CLI Usage](#-command-line-interface-cli) • [Engine Health](#-engine-health--bot-challenges) • [Architecture](#-architecture--engine-flow) • [Custom Engines](#-custom-search-engines)
 
 </div>
 
@@ -26,6 +26,9 @@
   - **Round-Robin Load Distribution (`ROUND_ROBIN`)**: Circularly shifts the initial search engine for each incoming query to balance traffic across providers.
   - **Random Rotation (`RANDOM`)**: Picks a randomized starting engine with subsequent fallback.
   - **Concurrent Fastest (`FASTEST`)**: Dispatches queries in parallel across worker threads and returns the fastest valid engine response.
+- 🩺 **Engine Health Memory**:
+  - Bot challenges (captcha, DuckDuckGo HTTP 202 anomaly page, JavaScript walls) are told apart from genuine "no results" answers.
+  - A blocked engine rests (5 min, doubling up to 30 min) instead of being asked again on every query; `engine_status()` shows who rests and why.
 - ⚡ **Zero-Latency Smart Cache (< 1ms)**:
   - **In-Memory Cache (`InMemoryCache`)**: Thread-safe with configurable TTL (Time-To-Live) and LRU (Least-Recently-Used) eviction.
   - **Persistent SQLite Cache (`SQLiteCache`)**: Disk-backed cache with WAL mode, B-Tree indexes, and automated expired entry purging.
@@ -136,7 +139,7 @@ from web_search import WebSearcher, RotationStrategy, SQLiteCache
 searcher = WebSearcher(
     engines=["duckduckgo", "bing", "yahoo", "google", "qwant"],
     strategy=RotationStrategy.ROUND_ROBIN,
-    cache=SQLiteCache(db_path="search_cache.db", default_ttl_seconds=86400), # 24h TTL
+    cache=SQLiteCache(db_path="search_cache.db", default_ttl_seconds=86400),  # 24h TTL
     timeout=10.0,
 )
 
@@ -182,6 +185,70 @@ uv run websearch --list-engines
 
 ---
 
+## 🩺 Engine Health & Bot Challenges
+
+Scraped engines regularly answer with a captcha, an HTTP 202 / 403 / 429, or a page without results that is really a
+block. The library tells the three situations apart:
+
+| Engine answer | Raised | Engine rests? |
+| --- | --- | --- |
+| Bot challenge: captcha page, DuckDuckGo anomaly page (HTTP 202), Google "sorry" redirect or JavaScript wall, Qwant captcha answer | `ChallengeError` (a `RateLimitError`) | yes |
+| Refusal: HTTP 429, DuckDuckGo HTTP 403, Qwant HTTP 403 or `error_code` 24 | `RateLimitError` | yes |
+| Genuine "no results" page, parse failure, timeout, other HTTP errors | `EngineError` | no |
+
+- A challenge is recognised from the **structure** of the page (captcha widgets and scripts, challenge forms, a title
+  that is entirely a challenge title, a challenge sentence opening the page). A result or "no results" page that merely
+  contains words such as "captcha" or "unusual traffic" (in a snippet, or because they are the query) is not a block.
+- An engine that hit a block **rests** for 5 minutes, doubling on each consecutive block up to 30 minutes, and is skipped
+  by the next queries: you stop paying a failed request per query and stop hammering a blocked engine. A successful
+  search clears the memory of the engine, so its next block starts again from 5 minutes. If every engine is resting they
+  are all tried anyway.
+- The memory is process-wide by default (`SHARED_HEALTH`), so it also works with the throw-away searchers created by the
+  top-level `search()` helper. Pass `WebSearcher(health=EngineHealth(cooldown_s=60, max_cooldown_s=600))` for your own
+  policy.
+
+### Inspecting engine health: `engine_status()`
+
+```python
+from web_search import WebSearcher
+
+searcher = WebSearcher(engines=["duckduckgo", "bing", "mojeek"], cache=False)
+response = searcher.search("python 3.14 release notes")
+print(response.engine_used, response.fallback_history)
+
+for name, state in searcher.engine_status().items():
+    if state["resting"]:
+        print(f"{name}: resting {state['rest_left_s']:.0f}s after {state['consecutive_blocks']} block(s)")
+        print(f"    {state['last_error']}")
+```
+
+Output when DuckDuckGo answers with its bot challenge and Bing takes over:
+
+```text
+bing ['duckduckgo', 'bing']
+duckduckgo: resting 300s after 1 block(s)
+    [duckduckgo] DuckDuckGo answered with a bot challenge (HTTP 202)
+```
+
+`engine_status()` returns one entry per engine that has been asked so far (an engine that was never reached is absent):
+
+```python
+{
+    "duckduckgo": {
+        "resting": True,  # skipped by the next queries
+        "rest_left_s": 300.0,  # seconds before it is asked again
+        "consecutive_blocks": 1,  # blocks in a row; the rest doubles with each one
+        "last_error": "[duckduckgo] DuckDuckGo answered with a bot challenge (HTTP 202)",
+    },
+    "bing": {"resting": False, "rest_left_s": 0.0, "consecutive_blocks": 0, "last_error": ""},
+}
+```
+
+With the top-level helpers, read the shared memory directly: `SHARED_HEALTH.status()` returns the same dictionary and
+`SHARED_HEALTH.reset()` forgets every block.
+
+---
+
 ## 📐 Architecture & Engine Flow
 
 ```mermaid
@@ -212,6 +279,7 @@ Easily create and register custom search providers by inheriting from `BaseSearc
 ```python
 from web_search import BaseSearchEngine, EngineRegistry, SearchResult, WebSearcher
 
+
 class WikipediaSearchEngine(BaseSearchEngine):
     name = "wikipedia"
     display_name = "Wikipedia OpenSearch"
@@ -234,6 +302,7 @@ class WikipediaSearchEngine(BaseSearchEngine):
             for i in range(len(titles))
         ]
 
+
 # Register engine
 EngineRegistry.register("wikipedia", WikipediaSearchEngine)
 
@@ -246,14 +315,18 @@ response = searcher.search("Albert Einstein", max_results=3)
 
 ## 🧪 Testing & Code Quality
 
-Run the complete test suite (55 tests including unit, mock DOM parsing, and live network integration tests):
+The test suite (162 tests) is offline: engine answers are mocked or replayed from the pages in `tests/fixtures/`, and any
+socket connection attempted by a test is refused.
 
 ```bash
-# Run test suite
-uv run pytest -v
+# Quality gate: lint, format check, tests
+uv run ruff check . && uv run ruff format --check . && uv run pytest -q
 
 # Run with test coverage report
-uv run pytest --cov=web_search --cov-report=term-missing
+uv run pytest --cov=websearch_py --cov-report=term-missing
+
+# Opt-in live tests against the real engines (network, may hit rate limits)
+WEBSEARCH_LIVE=1 uv run pytest tests/test_live_integration.py -v
 ```
 
 ---
@@ -261,17 +334,3 @@ uv run pytest --cov=web_search --cov-report=term-missing
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
-
-### Engine health and bot challenges
-
-Scraped engines regularly answer with a captcha, an HTTP 202/429, or a "no results" page that is really a block. Since
-0.2.0:
-
-- a captcha / "unusual traffic" page is raised as `ChallengeError` (a `RateLimitError`) instead of "no results";
-- an engine that hit a block **rests** (5 min, doubling up to 30 min on repeated blocks) and is skipped by the next
-  queries, so you stop paying a failed request per query and stop hammering a blocked engine; if every engine is resting
-  they are all tried anyway; plain "0 results" never makes an engine rest and a success clears the memory;
-- the memory is process-wide by default (`SHARED_HEALTH`), so it also works with the throw-away searchers created by the
-  top-level `search()` helper; pass `WebSearcher(health=EngineHealth(cooldown_s=60))` for your own policy;
-- `searcher.engine_status()` reports which engines rest, for how long, and why.
-

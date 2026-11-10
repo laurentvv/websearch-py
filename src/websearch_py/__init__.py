@@ -19,8 +19,8 @@ from websearch_py.engines.registry import EngineRegistry
 from websearch_py.engines.yahoo import YahooEngine
 from websearch_py.exceptions import (
     AllEnginesFailedError,
-    ChallengeError,
     CacheError,
+    ChallengeError,
     EngineError,
     EngineParseError,
     RateLimitError,
@@ -43,7 +43,7 @@ from websearch_py.searcher import (
 
 __version__ = "0.2.0"
 
-__all__ = [
+__all__ = [  # noqa: RUF022 - grouped by theme, not alphabetically
     # Top-level API
     "search",
     "search_json",

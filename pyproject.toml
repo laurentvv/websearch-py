@@ -59,7 +59,16 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "responses>=0.26.2",
+    "ruff==0.17.4",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Scraping is best effort: engines and the fallback loop deliberately turn any failure of a
+# remote site into an EngineError (or into "try the next engine").
+ignore = ["BLE001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

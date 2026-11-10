@@ -8,7 +8,7 @@ from websearch_py.cache.sqlite import SQLiteCache
 __all__ = [
     "BaseCache",
     "InMemoryCache",
-    "SQLiteCache",
     "NullCache",
+    "SQLiteCache",
     "normalize_query",
 ]

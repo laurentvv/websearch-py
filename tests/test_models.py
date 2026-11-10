@@ -1,6 +1,7 @@
 """Tests for SearchResult and SearchResponse data models."""
 
 import json
+
 from websearch_py.models import SearchResponse, SearchResult
 
 
@@ -45,12 +46,8 @@ def test_search_result_to_dict():
 
 
 def test_search_response_to_json_clean_format():
-    res1 = SearchResult(
-        titre="Site 1", url="https://site1.com", extrait="Extrait 1", engine="ddg", rank=1
-    )
-    res2 = SearchResult(
-        titre="Site 2", url="https://site2.com", extrait="Extrait 2", engine="ddg", rank=2
-    )
+    res1 = SearchResult(titre="Site 1", url="https://site1.com", extrait="Extrait 1", engine="ddg", rank=1)
+    res2 = SearchResult(titre="Site 2", url="https://site2.com", extrait="Extrait 2", engine="ddg", rank=2)
     resp = SearchResponse(
         query="python",
         results=[res1, res2],
@@ -78,9 +75,7 @@ def test_search_response_to_json_clean_format():
 
 
 def test_search_response_to_json_detailed_format():
-    res = SearchResult(
-        titre="Python", url="https://python.org", extrait="Language", engine="bing", rank=1
-    )
+    res = SearchResult(titre="Python", url="https://python.org", extrait="Language", engine="bing", rank=1)
     resp = SearchResponse(
         query="python",
         results=[res],
@@ -104,8 +99,7 @@ def test_search_response_to_json_detailed_format():
 
 def test_search_response_iteration_and_indexing():
     results = [
-        SearchResult(titre=f"Title {i}", url=f"https://example{i}.com", extrait=f"Snippet {i}")
-        for i in range(3)
+        SearchResult(titre=f"Title {i}", url=f"https://example{i}.com", extrait=f"Snippet {i}") for i in range(3)
     ]
     resp = SearchResponse(query="test", results=results)
 

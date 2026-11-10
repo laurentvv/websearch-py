@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from websearch_py.cache.base import BaseCache
 from websearch_py.models import SearchResult
 
@@ -16,8 +14,8 @@ class NullCache(BaseCache):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-    ) -> Optional[list[SearchResult]]:
+        region: str | None = None,
+    ) -> list[SearchResult] | None:
         return None
 
     def set(
@@ -26,8 +24,8 @@ class NullCache(BaseCache):
         results: list[SearchResult],
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
-        ttl: Optional[int] = None,
+        region: str | None = None,
+        ttl: int | None = None,
     ) -> None:
         pass
 
@@ -36,7 +34,7 @@ class NullCache(BaseCache):
         query: str,
         max_results: int = 10,
         language: str = "en",
-        region: Optional[str] = None,
+        region: str | None = None,
     ) -> bool:
         return False
 
