@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-from websearch_py.engines.base import BaseSearchEngine
-from websearch_py.exceptions import EngineError, RateLimitError
+import requests
+
+from websearch_py.engines.base import BaseSearchEngine, looks_blocked
+from websearch_py.exceptions import ChallengeError, RateLimitError
 from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -29,6 +32,7 @@ class QwantEngine(BaseSearchEngine):
     ) -> list[SearchResult]:
         """Execute search on Qwant."""
         results: list[SearchResult] = []
+        pages: list[str] = []  # answers without results, checked for a challenge before reporting "no results"
         locale = f"{language.lower()}_{language.upper()}" if language else "fr_FR"
         if region:
             locale = f"{language.lower()}_{region.upper()}"
@@ -51,10 +55,9 @@ class QwantEngine(BaseSearchEngine):
                 timeout=self.timeout,
                 proxies=self.proxies,
             )
-            if resp.status_code == 429:
-                raise RateLimitError(self.name, "Qwant rate limited")
+            data = self._api_payload(resp)
+            self._raise_if_blocked(resp, data, query)
             if resp.status_code == 200:
-                data = resp.json()
                 items = data.get("data", {}).get("result", {}).get("items", {}).get("mainline", [])
                 for group in items:
                     for item in group.get("items", []):
@@ -89,6 +92,7 @@ class QwantEngine(BaseSearchEngine):
                     timeout=self.timeout,
                     proxies=self.proxies,
                 )
+                pages.append(resp_lite.text)
                 if resp_lite.status_code == 200:
                     soup = self.parse_html(resp_lite.text)
                     for item in soup.select("article, .result, div.result"):
@@ -114,6 +118,33 @@ class QwantEngine(BaseSearchEngine):
                 logger.debug(f"Qwant Lite error: {e}")
 
         if not results:
-            raise EngineError(self.name, f"No results found for query: '{query}'")
+            raise self.empty_result_error(query, *pages)
 
         return results[:max_results]
+
+    @staticmethod
+    def _api_payload(resp: requests.Response) -> dict[str, Any]:
+        """JSON object of an API answer, or {} when the body is not one (HTML error or captcha page)."""
+        try:
+            payload = resp.json()
+        except ValueError:
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _raise_if_blocked(self, resp: requests.Response, payload: dict[str, Any], query: str) -> None:
+        """Qwant reports its blocks in the API answer itself.
+
+        A top-level "url" is the address of the captcha to solve, error_code 24 is a rate limit and HTTP 403 is the
+        bot protection refusing the client (reference: SearXNG qwant engine, commit 57ff753; HTTP 403 with
+        error_code 50 was the answer observed on 2026-11-10).
+        """
+        if resp.status_code == 200 and payload.get("status") == "success":
+            return
+        data = payload.get("data")
+        error_code = data.get("error_code") if isinstance(data, dict) else None
+        if payload.get("url") or looks_blocked(resp.text, query):
+            raise ChallengeError(self.name, "Qwant answered with a bot challenge (captcha)")
+        if resp.status_code == 429 or error_code == 24:
+            raise RateLimitError(self.name, "Qwant rate limited")
+        if resp.status_code == 403:
+            raise RateLimitError(self.name, f"Qwant refused the request (HTTP 403, error_code {error_code})")

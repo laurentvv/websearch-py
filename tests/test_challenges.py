@@ -14,12 +14,22 @@ from tests.conftest import (
     SAMPLE_MOJEEK_HTML,
     SAMPLE_YAHOO_HTML,
 )
-from websearch_py.engines import DuckDuckGoEngine, DuckDuckGoLiteEngine
+from websearch_py.engines import DuckDuckGoEngine, DuckDuckGoLiteEngine, QwantEngine
 from websearch_py.engines.base import looks_blocked
 from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
 
 DDG_HTML = "https://html.duckduckgo.com/html/"
 DDG_LITE = "https://lite.duckduckgo.com/lite/"
+QWANT_API = "https://api.qwant.com/v3/search/web"
+QWANT_LITE = "https://lite.qwant.com/"
+
+QWANT_EMPTY_ANSWER = {"status": "success", "data": {"query": {"query": "x"}, "result": {"items": {"mainline": []}}}}
+# How the bot protection in front of Qwant (DataDome) hands out its captcha: to API clients, then to browsers.
+DATADOME_JSON = {"url": "https://geo.captcha-delivery.com/captcha/?initialCid=TOKEN&cid=TOKEN&t=fe&s=1"}
+DATADOME_HTML = (
+    "<html><head><title>qwant.com</title></head><body><p>Please enable JS and disable any ad blocker</p>"
+    '<script src="https://ct.captcha-delivery.com/c.js"></script></body></html>'
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -255,4 +265,64 @@ def test_duckduckgo_lite_engine_genuine_no_result_page_is_a_plain_error():
 
     with pytest.raises(EngineError) as err:
         DuckDuckGoLiteEngine().search('"qzxvjkwpytmnbvqzxplkwhgfd" "xkqjzvwpqmznbxcvlkjh"')
+    assert_plain_no_results(err.value)
+
+
+# --- Qwant -----------------------------------------------------------------------------------------------------------
+@responses.activate
+@pytest.mark.parametrize("answer", [{"json": DATADOME_JSON}, {"body": DATADOME_HTML}])
+def test_qwant_api_captcha_answer_is_a_challenge(answer):
+    responses.add(responses.GET, QWANT_API, status=403, **answer)
+
+    with pytest.raises(ChallengeError):
+        QwantEngine().search("python")
+    assert len(responses.calls) == 1  # the HTML fallback is not asked once the API said "captcha"
+
+
+@responses.activate
+def test_qwant_captcha_page_on_the_html_fallback_is_a_challenge():
+    responses.add(responses.GET, QWANT_API, status=500)
+    responses.add(responses.GET, QWANT_LITE, body=DATADOME_HTML, status=403)
+
+    with pytest.raises(ChallengeError):
+        QwantEngine().search("python")
+
+
+@responses.activate
+@pytest.mark.parametrize(
+    ("status", "answer"),
+    [
+        (429, {"status": "error", "data": {"error_code": 24}}),
+        (200, {"status": "error", "data": {"error_code": 24}}),
+        (403, {"status": "error", "data": {"error_code": 50}}),  # the answer observed on 2026-11-10
+    ],
+)
+def test_qwant_api_refusals_are_rate_limits(status, answer):
+    responses.add(responses.GET, QWANT_API, json=answer, status=status)
+
+    with pytest.raises(RateLimitError) as err:
+        QwantEngine().search("python")
+    assert not isinstance(err.value, ChallengeError)
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_qwant_genuine_no_result_answer_is_a_plain_error():
+    responses.add(responses.GET, QWANT_API, json=QWANT_EMPTY_ANSWER, status=200)
+    responses.add(responses.GET, QWANT_LITE, body=fixture("qwant_spa_no_results.html"), status=200)
+
+    with pytest.raises(EngineError) as err:
+        QwantEngine().search("qzxvjkwpyt8842 mnbvqzxplk7731")
+    assert_plain_no_results(err.value)
+
+
+@responses.activate
+def test_qwant_no_result_for_a_query_made_of_marker_words_is_a_plain_error():
+    query = "captcha unusual traffic"
+    page = fixture("qwant_spa_no_results.html").replace("qzxvjkwpyt8842 mnbvqzxplk7731", query)
+    responses.add(responses.GET, QWANT_API, json=QWANT_EMPTY_ANSWER, status=200)
+    responses.add(responses.GET, QWANT_LITE, body=page, status=200)
+
+    with pytest.raises(EngineError) as err:
+        QwantEngine().search(query)
     assert_plain_no_results(err.value)
