@@ -22,6 +22,10 @@ class RateLimitError(EngineError):
     pass
 
 
+class ChallengeError(RateLimitError):
+    """The engine answered with a bot challenge (captcha, "unusual traffic"...) instead of results."""
+
+
 class EngineParseError(EngineError):
     """Raised when HTML parsing fails to extract search results."""
     pass

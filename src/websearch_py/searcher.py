@@ -13,6 +13,7 @@ from websearch_py.cache.null import NullCache
 from websearch_py.cache.sqlite import SQLiteCache
 from websearch_py.engines.base import BaseSearchEngine
 from websearch_py.engines.registry import EngineRegistry
+from websearch_py.health import SHARED_HEALTH, EngineHealth
 from websearch_py.exceptions import (
     AllEnginesFailedError,
     EngineError,
@@ -51,6 +52,7 @@ class WebSearcher:
         timeout: float = 10.0,
         cache_ttl: int = 3600,
         proxies: Optional[dict[str, str]] = None,
+        health: Optional[EngineHealth] = None,
     ):
         """Initialize WebSearcher.
 
@@ -61,7 +63,10 @@ class WebSearcher:
             timeout: Default HTTP request timeout per engine in seconds.
             cache_ttl: Default cache TTL in seconds (default: 3600s / 1h).
             proxies: Optional proxy dict for HTTP requests.
+            health: Engine health memory (engines that hit a captcha / rate limit rest for a while). Defaults to a
+                process-wide instance, so the memory survives the short-lived searchers of the top-level helpers.
         """
+        self.health = health or SHARED_HEALTH
         self.timeout = timeout
         self.proxies = proxies
 
@@ -197,7 +202,13 @@ class WebSearcher:
         errors: dict[str, str] = {}
         fallback_history: list[str] = []
 
-        for engine in ordered_engines:
+        # Engines that recently answered with a captcha / rate limit rest, unless every engine is resting.
+        healthy = [e for e in ordered_engines if not self.health.is_resting(e.name)]
+        for e in ordered_engines:
+            if e not in healthy and healthy:
+                errors[e.name] = "resting after a recent block (captcha / rate limit)"
+
+        for engine in healthy or ordered_engines:
             fallback_history.append(engine.name)
             logger.info(f"Attempting search with engine '{engine.name}' for '{query}'")
 
@@ -210,6 +221,7 @@ class WebSearcher:
                 )
 
                 if results:
+                    self.health.record_success(engine.name)
                     elapsed_ms = (time.perf_counter() - start_time) * 1000.0
                     logger.info(
                         f"Search SUCCESS with engine '{engine.name}' ({len(results)} results in {elapsed_ms:.1f}ms)"
@@ -228,6 +240,7 @@ class WebSearcher:
 
             except Exception as e:
                 errors[engine.name] = str(e)
+                self.health.record_failure(engine.name, e)
                 logger.warning(f"Engine '{engine.name}' failed: {e}, falling back to next engine...")
 
         # If all engines failed
@@ -242,7 +255,7 @@ class WebSearcher:
         start_time: float,
     ) -> SearchResponse:
         """Query all engines concurrently and return the fastest valid response."""
-        engines = self.rotator.engines
+        engines = [e for e in self.rotator.engines if not self.health.is_resting(e.name)] or self.rotator.engines
         errors: dict[str, str] = {}
         fallback_history = [e.name for e in engines]
 
@@ -264,6 +277,7 @@ class WebSearcher:
                 try:
                     eng_name, results = future.result()
                     if results:
+                        self.health.record_success(eng_name)
                         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
                         return SearchResponse(
                             query=query,
@@ -277,8 +291,13 @@ class WebSearcher:
                         errors[engine.name] = "0 results returned"
                 except Exception as e:
                     errors[engine.name] = str(e)
+                    self.health.record_failure(engine.name, e)
 
         raise AllEnginesFailedError(query=query, errors=errors)
+
+    def engine_status(self) -> dict[str, dict[str, object]]:
+        """Health snapshot: which engines are resting after a block, for how long, and the last error."""
+        return self.health.status()
 
     def search_json(
         self,

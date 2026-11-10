@@ -102,6 +102,7 @@ The dependency (`duckdb>=1.1.0`) is declared inside the script (PEP 723): uv bui
 *(schema contracts, product invariants, domain rules…)*
 
 ### Pitfalls & lessons (dated format)
+- **[2026-11-10] live engine probe** — on the day only Bing and Yahoo answered: DuckDuckGo gave HTTP 202, Brave 429 and Mojeek a captcha page with HTTP 200 that was parsed as "no results"; always check a blank result page for challenge markers before calling it empty, and keep a per-engine cooldown.
 - **[YYYY-MM-DD] context** — rule kept. *(Lessons live HERE, never in the common block: it is overwritten on every sync.)*
 
 ### References

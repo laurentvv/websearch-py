@@ -56,7 +56,7 @@ class YahooEngine(BaseSearchEngine):
 
             results = self._parse_response(response.text, max_results)
             if not results:
-                raise EngineError(self.name, f"No results found for query: '{query}'")
+                raise self.empty_result_error(query, response.text)
 
             return results[:max_results]
 

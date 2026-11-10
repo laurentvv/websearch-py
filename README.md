@@ -261,3 +261,17 @@ uv run pytest --cov=web_search --cov-report=term-missing
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+### Engine health and bot challenges
+
+Scraped engines regularly answer with a captcha, an HTTP 202/429, or a "no results" page that is really a block. Since
+0.2.0:
+
+- a captcha / "unusual traffic" page is raised as `ChallengeError` (a `RateLimitError`) instead of "no results";
+- an engine that hit a block **rests** (5 min, doubling up to 30 min on repeated blocks) and is skipped by the next
+  queries, so you stop paying a failed request per query and stop hammering a blocked engine; if every engine is resting
+  they are all tried anyway; plain "0 results" never makes an engine rest and a success clears the memory;
+- the memory is process-wide by default (`SHARED_HEALTH`), so it also works with the throw-away searchers created by the
+  top-level `search()` helper; pass `WebSearcher(health=EngineHealth(cooldown_s=60))` for your own policy;
+- `searcher.engine_status()` reports which engines rest, for how long, and why.
+

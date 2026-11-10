@@ -19,12 +19,14 @@ from websearch_py.engines.registry import EngineRegistry
 from websearch_py.engines.yahoo import YahooEngine
 from websearch_py.exceptions import (
     AllEnginesFailedError,
+    ChallengeError,
     CacheError,
     EngineError,
     EngineParseError,
     RateLimitError,
     WebSearchError,
 )
+from websearch_py.health import SHARED_HEALTH, EngineHealth
 from websearch_py.models import (
     EngineName,
     RotationStrategy,
@@ -39,7 +41,7 @@ from websearch_py.searcher import (
     search_json,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Top-level API
@@ -77,5 +79,8 @@ __all__ = [
     "RateLimitError",
     "EngineParseError",
     "AllEnginesFailedError",
+    "ChallengeError",
+    "EngineHealth",
+    "SHARED_HEALTH",
     "CacheError",
 ]
