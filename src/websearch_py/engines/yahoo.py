@@ -50,6 +50,11 @@ class YahooEngine(BaseSearchEngine):
             if response.status_code == 429:
                 raise RateLimitError(self.name, "Yahoo rate limit encountered (HTTP 429)")
 
+            if response.status_code == 500 and not response.text.strip():
+                # Measured 2026-11-10: Yahoo's edge answers an empty HTTP 500 to some clients (here: Python's TLS
+                # stack) while curl and a browser get 200 with the same headers; retrying at once only feeds it.
+                raise RateLimitError(self.name, "Yahoo refused the request (empty HTTP 500)")
+
             if response.status_code != 200:
                 raise EngineError(self.name, f"Yahoo returned HTTP status {response.status_code}")
 

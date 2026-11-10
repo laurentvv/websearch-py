@@ -144,6 +144,15 @@ class DuckDuckGoEngine(BaseSearchEngine):
 
         return results
 
+    @staticmethod
+    def _is_sponsored(link_elem, raw_url: str | None) -> bool:
+        """True for a Lite advertisement (ad redirect URL, or a row marked as sponsored)."""
+        href = str(raw_url or "")
+        if "ad_domain=" in href or "ad_provider=" in href or "/y.js" in href or "bing.com/aclick" in href:
+            return True
+        row = link_elem.find_parent("tr")
+        return bool(row and any("sponsored" in c for c in row.get("class", [])))
+
     def _parse_lite_response(self, html_text: str, max_results: int) -> list[SearchResult]:
         """Parse DuckDuckGo Lite table page."""
         soup = self.parse_html(html_text)
@@ -155,6 +164,8 @@ class DuckDuckGoEngine(BaseSearchEngine):
         for i, link_elem in enumerate(links):
             title = self.clean_text(link_elem.get_text())
             raw_url = link_elem.get("href")
+            if self._is_sponsored(link_elem, raw_url):
+                continue
             clean_link = self.clean_url(raw_url)
 
             snippet = ""
