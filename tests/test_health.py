@@ -42,13 +42,22 @@ def hit(engine):
 
 # --- challenge detection ------------------------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "html", [CAPTCHA_PAGE, GOOGLE_SORRY, "<title>Just a moment...</title>", "x" * 10 + "g-recaptcha"]
+    "html",
+    [CAPTCHA_PAGE, GOOGLE_SORRY, "<title>Just a moment...</title>", '<div class="g-recaptcha" data-sitekey="k"></div>'],
 )
 def test_challenge_pages_are_recognised(html):
     assert looks_blocked(html)
 
 
-@pytest.mark.parametrize("html", [OK_PAGE, "", "<html><body>No results for your query</body></html>"])
+@pytest.mark.parametrize(
+    "html",
+    [
+        OK_PAGE,
+        "",
+        "<html><body>No results for your query</body></html>",
+        "x" * 10 + "g-recaptcha",  # the name in plain text (a snippet about reCAPTCHA) is not the widget
+    ],
+)
 def test_ordinary_pages_are_not_flagged(html):
     assert not looks_blocked(html)
 

@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 
 import requests
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 
 from websearch_py.exceptions import (
     ChallengeError,
@@ -36,19 +37,99 @@ USER_AGENTS = [
 ]
 
 
-# Phrases found in the <title> / first screen of bot-challenge pages (checked in lower case).
-_BLOCK_MARKERS = re.compile(
-    r"<title>\s*(captcha|just a moment|attention required|access denied|are you a robot|verify)"
-    r"|unusual traffic|automated queries|verify you are (a )?human|are you a robot|robot check|"
-    r"complete the (captcha|security check)|detected unusual|enable javascript and cookies to continue|"
-    r"g-recaptcha|h-captcha|cf-challenge|/sorry/index",
+# --- bot-challenge detection ---------------------------------------------------------------------------------------
+# A challenge page is recognised from its own structure, never from words that a result snippet or an echoed query
+# may contain ("captcha", "unusual traffic"...). Three signals, any of them is enough:
+#   1. names in its markup: class / id of an element, path of a form action, of a script / iframe source or of a
+#      meta refresh (reCAPTCHA, hCaptcha, ALTCHA, Cloudflare, DuckDuckGo anomaly modal, Google "sorry" / "enablejs");
+#   2. its <title>, when the whole title is a challenge title ("Captcha", "Just a moment...");
+#   3. a challenge sentence in the lead of the page: the visible text placed before the first text link. A challenge
+#      page opens with its message, a result page opens with links.
+_MARKUP_MARKERS = re.compile(
+    r"captcha|altcha|challenge|anomaly-modal|anomaly\.js|cf-turnstile|/sorry/index|/httpservice/retry/enablejs",
     re.IGNORECASE,
 )
+_CHALLENGE_TITLE = re.compile(
+    r"(captcha|just a moment|attention required|access denied|are you a robot|robot check|security check|"
+    r"verification required|human verification|verify (that )?you are (a )?human)\W*",
+    re.IGNORECASE,
+)
+_CHALLENGE_PHRASES = re.compile(
+    r"unusual traffic|automated (queries|requests)|verify (that )?you are (a |not a )?(human|robot)|are you a robot|"
+    r"robot check|complete the (following )?(captcha|challenge|security check)|flagged as (being )?suspicious|"
+    r"bots use duckduckgo|enable javascript and cookies to continue|required to complete this challenge",
+    re.IGNORECASE,
+)
+# Site suffix of a title: "Captcha - Brave Search", "Attention Required! | Cloudflare".
+_TITLE_SITE_SUFFIX = re.compile(r"\s+[-|–—·]\s+")
 
 
-def looks_blocked(html: str) -> bool:
-    """True when the page is a bot challenge / captcha rather than a search result page."""
-    return bool(html) and bool(_BLOCK_MARKERS.search(html[:6000]))
+def _parse(html: str) -> BeautifulSoup:
+    """Parse HTML with lxml when available, else with the standard library parser."""
+    try:
+        return BeautifulSoup(html, "lxml")
+    except Exception:
+        return BeautifulSoup(html, "html.parser")
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _has_challenge_markup(soup: BeautifulSoup) -> bool:
+    for tag in soup.find_all(True):
+        names = [*(tag.get("class") or []), tag.get("id") or ""]
+        target = ""
+        if tag.name == "form":
+            target = tag.get("action") or ""
+        elif tag.name in ("script", "iframe"):
+            target = tag.get("src") or ""
+        elif tag.name == "meta" and (tag.get("http-equiv") or "").lower() == "refresh":
+            target = tag.get("content") or ""
+        names.append(str(target).split("?", 1)[0])  # the query string may echo the user's query
+        if any(_MARKUP_MARKERS.search(str(name)) for name in names):
+            return True
+    return False
+
+
+def _lead_text(soup: BeautifulSoup) -> str:
+    """Visible text placed before the first text link of the page."""
+    for tag in soup(["script", "style", "template"]):
+        tag.decompose()
+    root = soup.body or soup
+    first_link = next((a for a in root.find_all("a", href=True) if a.get_text(strip=True)), None)
+    parts: list[str] = []
+    for node in root.descendants:
+        if node is first_link:
+            break
+        if type(node) is NavigableString:  # not Comment / Doctype / CData
+            parts.append(str(node))
+    return _squash(" ".join(parts))
+
+
+def looks_blocked(html: str, query: str = "") -> bool:
+    """True when the page is a bot challenge / captcha rather than a search result (or "no result") page.
+
+    Args:
+        html: The page to inspect.
+        query: The query that produced the page, when known: its echo (page title, "No results for ...") is ignored.
+    """
+    if not html or not html.strip():
+        return False
+    soup = _parse(html)
+    if _has_challenge_markup(soup):
+        return True
+
+    query = _squash(query).lower()
+    title = _squash(soup.title.get_text()) if soup.title else ""
+    echoes_query = bool(query) and title.lower().startswith(query)
+    if title and not echoes_query and _CHALLENGE_TITLE.fullmatch(_TITLE_SITE_SUFFIX.split(title, maxsplit=1)[0]):
+        return True
+
+    lead = _lead_text(soup)
+    if query:
+        lead = re.sub(re.escape(query), " ", lead, flags=re.IGNORECASE)
+    return bool(_CHALLENGE_PHRASES.search(lead))
 
 
 class BaseSearchEngine(ABC):
@@ -77,10 +158,14 @@ class BaseSearchEngine(ABC):
         self.custom_headers = headers or {}
         self.session = session or requests.Session()
 
-    def empty_result_error(self, query: str, html: str = "") -> EngineError:
-        """Error for a page that gave no result: a ChallengeError when it is a captcha, else a plain EngineError."""
-        if looks_blocked(html):
-            return ChallengeError(self.name, f"{self.display_name} answered with a bot challenge (captcha)")
+    def empty_result_error(self, query: str, *pages: str) -> EngineError:
+        """Error for an answer without results.
+
+        A ChallengeError when one of the answered pages is a bot challenge (the engine then rests), else the plain
+        "no results" EngineError, which never makes an engine rest.
+        """
+        if any(looks_blocked(page, query) for page in pages):
+            return ChallengeError(self.name, f"{self.display_name} answered with a bot challenge instead of results")
         return EngineError(self.name, f"No results found for query: '{query}'")
 
     def get_headers(self) -> dict[str, str]:
@@ -104,10 +189,7 @@ class BaseSearchEngine(ABC):
 
     def parse_html(self, html_content: str) -> BeautifulSoup:
         """Parse HTML string using lxml if available, falling back to html.parser."""
-        try:
-            return BeautifulSoup(html_content, "lxml")
-        except Exception:
-            return BeautifulSoup(html_content, "html.parser")
+        return _parse(html_content)
 
     def clean_text(self, text: str | None) -> str:
         """Clean and normalize extracted text string."""
