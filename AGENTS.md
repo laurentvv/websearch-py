@@ -91,7 +91,10 @@ The dependency (`duckdb>=1.1.0`) is declared inside the script (PEP 723): uv bui
 ### Key commands
 ```bash
 # state ledger (canon §2): uv run --no-project .agents/skills/agent-state/scripts/state_agents.py bootstrap
-# §3 gate (pinned versions, identical in CI): lint ... ; tests ...
+# §3 gate (ruff pinned to 0.17.4 in the dev group; the test run is offline):
+uv run ruff check . && uv run ruff format --check . && uv run pytest -q
+# opt-in live tests against the real engines (network, feeds their rate limiters):
+WEBSEARCH_LIVE=1 uv run pytest tests/test_live_integration.py -v
 # build: ...
 # run: ...
 # large repositories (>5k files): fast indexed code search with tgrep (on PATH; index dir `.tgrep/` stays git-ignored)
@@ -103,6 +106,13 @@ The dependency (`duckdb>=1.1.0`) is declared inside the script (PEP 723): uv bui
 
 ### Pitfalls & lessons (dated format)
 - **[2026-11-10] live engine probe** — on the day only Bing and Yahoo answered: DuckDuckGo gave HTTP 202, Brave 429 and Mojeek a captcha page with HTTP 200 that was parsed as "no results"; always check a blank result page for challenge markers before calling it empty, and keep a per-engine cooldown.
+- **[2026-11-10] challenge detection** — never call a page a block because of words in its text: a real Bing result page for the query "captcha unusual traffic" matched the old keyword regex and Bing was put to rest for nothing. Detect a challenge from the page structure (captcha / challenge names in class, id, form action, script source, meta refresh; a title that is entirely a challenge title; a challenge sentence before the first text link) and pass the query to `looks_blocked()` so its echo is ignored.
+- **[2026-11-10] how each engine really blocks** — measured, not assumed: DuckDuckGo serves its anomaly modal with HTTP 202 (`form#challenge-form`, `.anomaly-modal__*`); Mojeek an ALTCHA page titled "Captcha" with HTTP 200; Brave HTTP 429 plus a "schedule a captcha" notice; Google (`gbv=1`) only a JavaScript wall (`/httpservice/retry/enablejs`) with HTTP 200; the Qwant API HTTP 403 `{"status":"error","data":{"error_code":50}}` while `lite.qwant.com` now redirects to the JavaScript app (that fallback can no longer return results). Re-probe before trusting this list.
+- **[2026-11-10] genuine "no results" pages** — a recognised no-result page must end the search with the plain `EngineError` (never a `RateLimitError`): DuckDuckGo used to send three more requests after it, which feeds the bot detection. To capture one, quote a nonsense token: Bing and Brave relax an unquoted or even quoted nonsense query and return results, so their no-result fixtures are reconstructed (see `tests/fixtures/README.md`).
+- **[2026-11-10] new engine checklist** — an engine registered without a no-result fixture fails `test_every_registered_engine_has_a_no_result_fixture`: add its answers to `NO_RESULT_ANSWERS` and `CHALLENGE_ANSWERS` in `tests/test_challenges.py`.
+- **[2026-11-10] gate tooling** — the gate command named ruff but ruff was not a dependency (`uv run ruff`: "program not found"), so it had never run; ruff 0.17 enables far more rules by default than E/F (161 findings on the first run). A gate tool lives in the dev group, pinned, and is run once before it is written into a contract.
+- **[2026-11-10] offline tests** — the live tests used to run on every `pytest` call when the machine was online (four real queries per run, a gate that depends on the mood of the engines). They are opt-in (`WEBSEARCH_LIVE=1`) and `conftest.py` refuses any socket in the other tests; never add a test that needs the network outside `tests/test_live_integration.py`.
+- **[2026-11-10] ledger on a fresh clone** — `.agent/` and `.agents/` are git-ignored, so a fresh clone has neither the ledger nor the agent-state skill: reinstall the kit, or run its `state_agents.py` from another kit-managed checkout with `--repo .`.
 - **[YYYY-MM-DD] context** — rule kept. *(Lessons live HERE, never in the common block: it is overwritten on every sync.)*
 
 ### References
