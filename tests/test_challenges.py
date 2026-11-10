@@ -486,3 +486,31 @@ def test_google_redirect_to_its_sorry_page_is_a_challenge():
     engine.session.get = lambda *args, **kwargs: SorryResponse()
     with pytest.raises(ChallengeError):
         engine.search("python")
+
+
+# --- Yahoo empty HTTP 500, DuckDuckGo Lite advertisements ------------------------------------------------------------
+@responses.activate
+def test_yahoo_empty_http_500_is_a_block_that_makes_the_engine_rest():
+    responses.add(responses.GET, YAHOO, body="", status=500)
+    with pytest.raises(RateLimitError):
+        YahooEngine().search("python")
+    responses.replace(responses.GET, YAHOO, body="<html>boom</html>", status=500)
+    with pytest.raises(EngineError) as err:
+        YahooEngine().search("python")
+    assert not isinstance(err.value, RateLimitError)  # a 500 with a body stays an ordinary failure
+
+
+@responses.activate
+def test_duckduckgo_lite_skips_advertisements():
+    ad = "//duckduckgo.com/y.js?ad_domain=example.com&ad_provider=bingv7aa&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3Dx"
+    page = (
+        "<html><body><table>"
+        f"<tr><td><a rel='nofollow' href='{ad}' class='result-link'>Ad title</a></td></tr>"
+        "<tr><td class='result-snippet'>Ad text</td></tr>"
+        "<tr><td><a rel='nofollow' href='https://www.python.org/' class='result-link'>Welcome to Python.org</a></td></tr>"
+        "<tr><td class='result-snippet'>The official home</td></tr>"
+        "</table></body></html>"
+    )
+    responses.add(responses.POST, DDG_LITE, body=page, status=200)
+    results = DuckDuckGoLiteEngine().search("python", max_results=5)
+    assert [r.url for r in results] == ["https://www.python.org/"]

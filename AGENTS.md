@@ -113,6 +113,8 @@ WEBSEARCH_LIVE=1 uv run pytest tests/test_live_integration.py -v
 - **[2026-11-10] gate tooling** — the gate command named ruff but ruff was not a dependency (`uv run ruff`: "program not found"), so it had never run; ruff 0.17 enables far more rules by default than E/F (161 findings on the first run). A gate tool lives in the dev group, pinned, and is run once before it is written into a contract.
 - **[2026-11-10] offline tests** — the live tests used to run on every `pytest` call when the machine was online (four real queries per run, a gate that depends on the mood of the engines). They are opt-in (`WEBSEARCH_LIVE=1`) and `conftest.py` refuses any socket in the other tests; never add a test that needs the network outside `tests/test_live_integration.py`.
 - **[2026-11-10] ledger on a fresh clone** — `.agent/` and `.agents/` are git-ignored, so a fresh clone has neither the ledger nor the agent-state skill: reinstall the kit, or run its `state_agents.py` from another kit-managed checkout with `--repo .`.
+- **[2026-11-10] Yahoo empty HTTP 500** — Yahoo's edge answers an empty 500 (even for its home page) to Python's TLS stack while curl and a browser get 200 with identical headers: it is a client-fingerprint block, so it counts as a `RateLimitError` (the engine rests). Imitating a browser fingerprint to get around it is bot-detection circumvention and was deliberately not done.
+- **[2026-11-10] DuckDuckGo Lite ads** — sponsored rows can come back as `y.js?ad_domain=…` / `bing.com/aclick` links: skip them, they are not results (the fixture is reconstructed, no ad was served when captured).
 - **[YYYY-MM-DD] context** — rule kept. *(Lessons live HERE, never in the common block: it is overwritten on every sync.)*
 
 ### References
