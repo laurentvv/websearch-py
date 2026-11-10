@@ -13,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from websearch_py.exceptions import (
+    ChallengeError,
     EngineError,
     EngineParseError,
     RateLimitError,
@@ -36,6 +37,21 @@ USER_AGENTS = [
     # Edge Windows
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0",
 ]
+
+
+# Phrases found in the <title> / first screen of bot-challenge pages (checked in lower case).
+_BLOCK_MARKERS = re.compile(
+    r"<title>\s*(captcha|just a moment|attention required|access denied|are you a robot|verify)"
+    r"|unusual traffic|automated queries|verify you are (a )?human|are you a robot|robot check|"
+    r"complete the (captcha|security check)|detected unusual|enable javascript and cookies to continue|"
+    r"g-recaptcha|h-captcha|cf-challenge|/sorry/index",
+    re.IGNORECASE,
+)
+
+
+def looks_blocked(html: str) -> bool:
+    """True when the page is a bot challenge / captcha rather than a search result page."""
+    return bool(html) and bool(_BLOCK_MARKERS.search(html[:6000]))
 
 
 class BaseSearchEngine(ABC):
@@ -63,6 +79,12 @@ class BaseSearchEngine(ABC):
         self.proxies = proxies
         self.custom_headers = headers or {}
         self.session = session or requests.Session()
+
+    def empty_result_error(self, query: str, html: str = "") -> EngineError:
+        """Error for a page that gave no result: a ChallengeError when it is a captcha, else a plain EngineError."""
+        if looks_blocked(html):
+            return ChallengeError(self.name, f"{self.display_name} answered with a bot challenge (captcha)")
+        return EngineError(self.name, f"No results found for query: '{query}'")
 
     def get_headers(self) -> dict[str, str]:
         """Generate realistic browser headers with rotated User-Agent."""

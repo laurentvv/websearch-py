@@ -160,3 +160,13 @@ SAMPLE_MOJEEK_HTML = """
 </body>
 </html>
 """
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_engine_health():
+    """The engine health memory is process-wide by design: every test starts and ends with a clean slate."""
+    from websearch_py.health import SHARED_HEALTH
+
+    SHARED_HEALTH.reset()
+    yield
+    SHARED_HEALTH.reset()

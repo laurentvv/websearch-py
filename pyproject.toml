@@ -1,6 +1,6 @@
 [project]
 name = "websearch-py"
-version = "0.1.0"
+version = "0.2.0"
 description = "Resilient multi-engine web search scraper with automatic fallback, engine rotation, smart caching, and standardized JSON output."
 readme = "README.md"
 license = "MIT"
