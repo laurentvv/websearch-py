@@ -14,14 +14,31 @@ from tests.conftest import (
     SAMPLE_MOJEEK_HTML,
     SAMPLE_YAHOO_HTML,
 )
-from websearch_py.engines import DuckDuckGoEngine, DuckDuckGoLiteEngine, QwantEngine
-from websearch_py.engines.base import looks_blocked
+from websearch_py import EngineHealth, WebSearcher
+from websearch_py.engines import (
+    BingEngine,
+    BraveEngine,
+    DuckDuckGoEngine,
+    DuckDuckGoLiteEngine,
+    EngineRegistry,
+    GoogleEngine,
+    MojeekEngine,
+    QwantEngine,
+    YahooEngine,
+)
+from websearch_py.engines.base import BaseSearchEngine, looks_blocked
 from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
+from websearch_py.models import SearchResult
 
 DDG_HTML = "https://html.duckduckgo.com/html/"
 DDG_LITE = "https://lite.duckduckgo.com/lite/"
 QWANT_API = "https://api.qwant.com/v3/search/web"
 QWANT_LITE = "https://lite.qwant.com/"
+BING = "https://www.bing.com/search"
+BRAVE = "https://search.brave.com/search"
+GOOGLE = "https://www.google.com/search"
+MOJEEK = "https://www.mojeek.com/search"
+YAHOO = "https://search.yahoo.com/search"
 
 QWANT_EMPTY_ANSWER = {"status": "success", "data": {"query": {"query": "x"}, "result": {"items": {"mainline": []}}}}
 # How the bot protection in front of Qwant (DataDome) hands out its captcha: to API clients, then to browsers.
@@ -326,3 +343,146 @@ def test_qwant_no_result_for_a_query_made_of_marker_words_is_a_plain_error():
     with pytest.raises(EngineError) as err:
         QwantEngine().search(query)
     assert_plain_no_results(err.value)
+
+
+# --- every engine: a genuine "no results" answer is a plain error and never a reason to rest ------------------------
+def _json(payload):
+    return {"json": payload}
+
+
+def _page(name):
+    return {"body": fixture(name)}
+
+
+# engine class -> the mocked answers of a genuine empty search: (method, url, answer)
+NO_RESULT_ANSWERS = {
+    DuckDuckGoEngine: [(responses.POST, DDG_HTML, _page("ddg_html_no_results.html"))],
+    DuckDuckGoLiteEngine: [(responses.POST, DDG_LITE, _page("ddg_lite_no_results.html"))],
+    BingEngine: [(responses.GET, BING, _page("bing_no_results.html"))],
+    GoogleEngine: [(responses.GET, GOOGLE, _page("google_no_results.html"))],
+    YahooEngine: [(responses.GET, YAHOO, _page("yahoo_no_results.html"))],
+    QwantEngine: [
+        (responses.GET, QWANT_API, _json(QWANT_EMPTY_ANSWER)),
+        (responses.GET, QWANT_LITE, _page("qwant_spa_no_results.html")),
+    ],
+    BraveEngine: [(responses.GET, BRAVE, _page("brave_no_results.html"))],
+    MojeekEngine: [(responses.GET, MOJEEK, _page("mojeek_no_results.html"))],
+}
+ALL_ENGINES = pytest.mark.parametrize("engine_cls", list(NO_RESULT_ANSWERS), ids=lambda cls: cls.name)
+# The nonsense queries the fixture pages were captured with.
+FIXTURE_QUERIES = (
+    '"qzxvjkwpytmnbvqzxplkwhgfd" "xkqjzvwpqmznbxcvlkjh"',
+    "qzxvjkwpytmnbvqzxplkwhgfd xkqjzvwpqmznbxcvlkjh",
+    "qzxvjkwpyt8842 mnbvqzxplk7731",
+    "qzxvjkwpytmnbvqzxplkwhgfd",
+)
+
+
+def mock_no_result_answers(engine_cls, query: str | None = None) -> None:
+    """Mock the genuine empty answer of an engine, optionally rewritten as the answer to another query."""
+    for method, url, answer in NO_RESULT_ANSWERS[engine_cls]:
+        if query and "body" in answer:
+            body = answer["body"]
+            for fixture_query in FIXTURE_QUERIES:
+                body = body.replace(fixture_query, query)
+            assert query in body
+            answer = {"body": body}
+        responses.add(method, url, status=200, **answer)
+
+
+class AlwaysAnswers(BaseSearchEngine):
+    name, display_name = "backup", "Backup"
+
+    def search(self, query, max_results=10, language="en", region=None):
+        return [SearchResult(titre="t", url="https://example.org", extrait="s", engine=self.name, rank=1)]
+
+
+def test_every_registered_engine_has_a_no_result_fixture():
+    assert sorted(cls.name for cls in NO_RESULT_ANSWERS) == EngineRegistry.list_available()
+
+
+@responses.activate
+@ALL_ENGINES
+def test_a_genuine_no_result_answer_is_a_plain_error(engine_cls):
+    mock_no_result_answers(engine_cls)
+
+    with pytest.raises(EngineError) as err:
+        engine_cls().search("qzxvjkwpytmnbvqzxplkwhgfd")
+    assert_plain_no_results(err.value)
+
+
+@responses.activate
+@ALL_ENGINES
+def test_a_no_result_answer_for_a_query_made_of_marker_words_is_a_plain_error(engine_cls):
+    query = "captcha unusual traffic are you a robot"
+    mock_no_result_answers(engine_cls, query)
+
+    with pytest.raises(EngineError) as err:
+        engine_cls().search(query)
+    assert_plain_no_results(err.value)
+
+
+@responses.activate
+@ALL_ENGINES
+def test_a_genuine_no_result_answer_does_not_put_the_engine_to_rest(engine_cls):
+    mock_no_result_answers(engine_cls)
+    health = EngineHealth()
+    engine = engine_cls()
+    searcher = WebSearcher(engines=[engine, AlwaysAnswers()], cache=False, health=health)
+
+    for _ in range(2):
+        response = searcher.search("qzxvjkwpytmnbvqzxplkwhgfd", use_cache=False)
+        assert response.engine_used == "backup"
+        assert response.fallback_history == [engine.name, "backup"]  # asked again: it was not resting
+    assert not health.is_resting(engine.name)
+    assert engine.name not in searcher.engine_status()
+
+
+# --- every engine: a challenge answer puts it to rest ----------------------------------------------------------------
+# engine class -> (method, url, status, answer); captured answers where one exists, a generic captcha page otherwise
+CHALLENGE_ANSWERS = {
+    DuckDuckGoEngine: (responses.POST, DDG_HTML, 202, _page("ddg_html_anomaly.html")),
+    DuckDuckGoLiteEngine: (responses.POST, DDG_LITE, 202, _page("ddg_html_anomaly.html")),
+    GoogleEngine: (responses.GET, GOOGLE, 200, _page("google_enablejs.html")),
+    MojeekEngine: (responses.GET, MOJEEK, 200, _page("mojeek_captcha.html")),
+    BraveEngine: (responses.GET, BRAVE, 200, _page("brave_captcha.html")),
+    QwantEngine: (responses.GET, QWANT_API, 403, _json(DATADOME_JSON)),
+    BingEngine: (responses.GET, BING, 200, {"body": DATADOME_HTML}),
+    YahooEngine: (responses.GET, YAHOO, 200, {"body": DATADOME_HTML}),
+}
+
+
+@responses.activate
+@ALL_ENGINES
+def test_a_challenge_answer_is_a_challenge_error_and_puts_the_engine_to_rest(engine_cls):
+    method, url, status, answer = CHALLENGE_ANSWERS[engine_cls]
+    responses.add(method, url, status=status, **answer)
+    health = EngineHealth()
+    engine = engine_cls()
+    searcher = WebSearcher(engines=[engine, AlwaysAnswers()], cache=False, health=health)
+
+    with pytest.raises(ChallengeError):
+        engine_cls().search("python")
+    assert searcher.search("python", use_cache=False).engine_used == "backup"
+    assert health.is_resting(engine.name)
+    assert searcher.search("python again", use_cache=False).fallback_history == ["backup"]  # skipped while resting
+
+
+@responses.activate
+def test_brave_http_429_captcha_notice_is_a_rate_limit():
+    # The answer captured on 2026-11-10: the status alone already says "blocked".
+    responses.add(responses.GET, BRAVE, body=fixture("brave_captcha.html"), status=429)
+
+    with pytest.raises(RateLimitError):
+        BraveEngine().search("python")
+
+
+def test_google_redirect_to_its_sorry_page_is_a_challenge():
+    class SorryResponse:
+        status_code, text = 200, "<html><body></body></html>"
+        url = "https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dpython"
+
+    engine = GoogleEngine()
+    engine.session.get = lambda *args, **kwargs: SorryResponse()
+    with pytest.raises(ChallengeError):
+        engine.search("python")

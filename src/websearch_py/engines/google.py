@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from websearch_py.engines.base import BaseSearchEngine
-from websearch_py.exceptions import EngineError, RateLimitError
+from websearch_py.exceptions import ChallengeError, EngineError, RateLimitError
 from websearch_py.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -60,8 +60,10 @@ class GoogleEngine(BaseSearchEngine):
             )
 
             # Check for bot block / captcha
-            if response.status_code == 429 or "sorry/index" in response.url:
-                raise RateLimitError(self.name, "Google rate limit or CAPTCHA encountered")
+            if "sorry/index" in response.url:
+                raise ChallengeError(self.name, "Google answered with a bot challenge (redirect to its captcha page)")
+            if response.status_code == 429:
+                raise RateLimitError(self.name, "Google rate limit encountered (HTTP 429)")
 
             if response.status_code != 200:
                 raise EngineError(self.name, f"Google returned HTTP status {response.status_code}")
